@@ -18,7 +18,7 @@ model:
 data:
   name: "Kitti"
   # split: ["trainval", "selected_val"]
-  split: ["train", "trainval"]
+  split: ["trainfilled", "trainval"]
   path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]

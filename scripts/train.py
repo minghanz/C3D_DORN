@@ -21,6 +21,8 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 
+# sys.path.append(os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath(".."))  
 # running in parent dir
 os.chdir("..")
 

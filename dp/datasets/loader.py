@@ -16,6 +16,12 @@ from torch.utils.data.distributed import DistributedSampler
 from dp.datasets import _get_dataset
 from dp.utils.pyt_ops import interpolate
 
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+from c3d.utils.cam_proj import batch_cam_infos, CamInfo
+
+
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 
 default_collate_err_msg_format = (
@@ -29,7 +35,10 @@ def collate_fn(batch):
 
     elem = batch[0]
     elem_type = type(elem)
-    if isinstance(elem, torch.Tensor):
+    ### dedicated collate function for CamInfo
+    if isinstance(elem, CamInfo):
+        return batch_cam_infos(batch)
+    elif isinstance(elem, torch.Tensor):
         #### start
         h, w = elem.shape[-2:]
         if len(batch) > 0:

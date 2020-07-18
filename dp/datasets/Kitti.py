@@ -24,9 +24,12 @@ class Kitti(BaseDataset):
 
     def __init__(self, config, is_train=True, image_loader=PILLoader, depth_loader=KittiDepthLoader):
         super().__init__(config, is_train, image_loader, depth_loader)
-        file_list = "./dp/datasets/lists/kitti_{}.list".format(self.split)
+        # file_list = "./dp/datasets/lists/kitti_{}.list".format(self.split)
+        file_list = "./dp/datasets/lists/kitti_{}_from_bts.list".format(self.split)
         with open(file_list, "r") as f:
             self.filenames = f.readlines()
+            ### skip the files with no ground truth
+            self.filenames = [x for x in self.filenames if "None" not in x]
 
     def _parse_path(self, index):
         image_path, depth_path = self.filenames[index].split()
@@ -40,8 +43,11 @@ class Kitti(BaseDataset):
         W, H = image.size
         dH, dW = depth.shape
 
-        assert W == dW and H == dH, \
-            "image shape should be same with depth, but image shape is {}, depth shape is {}".format((H, W), (dH, dW))
+        ### Minghan: filled depth is of the same size, which may not be the same as images
+        minW = W if W < dW else dW
+        minH = H if H < dH else dH
+        # assert W == dW and H == dH, \
+        #     "image shape should be same with depth, but image shape is {}, depth shape is {}".format((H, W), (dH, dW))
 
         # scale_h, scale_w = max(crop_h/H, 1.0), max(crop_w/W, 1.0)
         # scale = max(scale_h, scale_w)
@@ -58,8 +64,12 @@ class Kitti(BaseDataset):
         crop_dh, crop_dw = int(crop_h / scale), int(crop_w / scale)
 
         # random crop size
-        x = random.randint(0, W - crop_w)
-        y = random.randint(0, H - crop_h)
+        ### Minghan: in case image and depth are not of the same size
+        # x = random.randint(0, W - crop_w)
+        # y = random.randint(0, H - crop_h)
+        x = random.randint(0, minW - crop_w)
+        y = random.randint(0, minH - crop_h)
+        
         dx, dy = math.floor(x/scale), math.floor(y/scale)
         # print("corp dh = {}, crop dw = {}".format(crop_dh, crop_dw))
 

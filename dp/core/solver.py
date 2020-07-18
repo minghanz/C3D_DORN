@@ -32,12 +32,13 @@ from dp.utils.comm import synchronize
 from dp.utils.pyt_ops import tensor2cuda
 from dp.version import __version__
 
-try:
-    from apex import amp
-    from apex.parallel import convert_syncbn_model, DistributedDataParallel
-except ImportError:
-    raise ImportError(
-        "Please install apex from https://www.github.com/nvidia/apex .")
+### Minghan: not using distributed training for now
+# try:
+#     from apex import amp
+#     from apex.parallel import convert_syncbn_model, DistributedDataParallel
+# except ImportError:
+#     raise ImportError(
+#         "Please install apex from https://www.github.com/nvidia/apex .")
 
 
 class Solver(object):

@@ -15,10 +15,11 @@ model:
     batch_norm: False
     discretization: "SID"
     pretrained: True
+    path_of_c3d_cfg: "./config/c3d_config.txt"
 data:
   name: "Kitti"
   # split: ["trainval", "selected_val"]
-  split: ["train", "trainval"]
+  split: ["trainsparse", "trainval"]
   path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]

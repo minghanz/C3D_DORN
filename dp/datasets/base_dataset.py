@@ -18,7 +18,12 @@ class BaseDataset(data.Dataset):
         self.root = self.config['path']
         self.split = self.config["split"]
         self.split = self.split[0] if is_train else self.split[1]
-        self.image_loader, self.depth_loader = image_loader, depth_loader
+        ### Minghan: if none, don't initialize the function here. Maybe they are written in the derived class
+        if image_loader is not None:
+            self.image_loader = image_loader
+        if depth_loader is not None:
+            self.depth_loader = depth_loader
+        # self.image_loader, self.depth_loader = image_loader, depth_loader
         if is_train:
             self.preprocess = self._tr_preprocess
         else:

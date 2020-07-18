@@ -49,10 +49,17 @@ class OrdinalRegressionLayer(nn.Module):
         # reimplementation for fast speed.
 
         x = x.view(-1, 2, ord_num, H, W)
-        if self.training:
-            prob = F.log_softmax(x, dim=1).view(N, C, H, W)
-            return prob
 
+        ### Minghan: to be able to incorporate other losses, return both nomatter in training mode or not
+        # if self.training:
+        #     prob = F.log_softmax(x, dim=1).view(N, C, H, W)
+        #     return prob
+
+        # ord_prob = F.softmax(x, dim=1)[:, 0, :, :, :]
+        # ord_label = torch.sum((ord_prob > 0.5), dim=1)
+        # return ord_prob, ord_label
+
+        prob = F.log_softmax(x, dim=1).view(N, C, H, W)
         ord_prob = F.softmax(x, dim=1)[:, 0, :, :, :]
         ord_label = torch.sum((ord_prob > 0.5), dim=1)
-        return ord_prob, ord_label
+        return prob, ord_prob, ord_label

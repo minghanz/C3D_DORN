@@ -20,6 +20,8 @@ from dp.modules.losses.ordinal_regression_loss import OrdinalRegressionLoss
 import sys
 sys.path.append("../../../")
 from c3d.c3d_loss import C3DLoss
+from c3d.utils_general.vis import overlay_dep_on_rgb
+import time
 
 class DepthPredModel(nn.Module):
 
@@ -72,6 +74,15 @@ class DepthPredModel(nn.Module):
                          prob: probability of each label, torch.Tensor, NxCxHxW, C is number of label
                          label: predicted label, torch.Tensor, NxHxW
         """
+        # ### test input correctness
+        ### if use this, need to disable "nomalize" in _tr_preprocess in dataset (Kitti.py)
+        # test_path = "input_visualization"
+        # target_vis = target.clone().detach()
+        # target_vis[target_vis < 0] = 0
+        # for ib in range(image.shape[0]):
+        #     name = "{}.jpg".format(time.time())
+        #     overlay_dep_on_rgb(target_vis[ib].unsqueeze(0), image[ib], path=test_path, name=name, overlay=False)
+
         N, C, H, W = image.shape
         feat = self.backbone(image)
         feat = self.SceneUnderstandingModule(feat)

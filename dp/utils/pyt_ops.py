@@ -57,8 +57,10 @@ def check_nan(vars):
 
 @make_iterative_func
 def tensor2cuda(vars):
-    assert isinstance(vars, torch.Tensor), "Type of vars must be Torch.tensor"
-    return vars.cuda(non_blocking=True)
+    ### Minghan: disable this assertion since we have CamInfo
+    # assert isinstance(vars, torch.Tensor), "Type of vars must be Torch.tensor"
+    # return vars.cuda(non_blocking=True)
+    return vars.cuda()
 
 
 @make_iterative_func

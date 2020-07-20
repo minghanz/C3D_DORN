@@ -25,19 +25,21 @@ from dp.datasets.Kitti import Kitti
 
 import sys
 sys.path.append("../../../")
-from c3d.utils_general.dataset_read import DataReader
+from c3d.utils_general.dataset_read import DataReaderKITTI
 from c3d.utils_general.calib import lidar_to_depth
 from c3d.utils.cam_proj import CamProj, seq_ops_on_cam_info
 from c3d.utils.cam import CamCrop
 
+from skimage.morphology import binary_dilation, binary_closing
 
+import torch
 
 class KittiRawLidar(Kitti):
 
     def __init__(self, config, is_train=True, image_loader=PILLoader, depth_loader=None):
         super().__init__(config, is_train, image_loader, depth_loader)
 
-        self.datareader = DataReader("kitti", self.root)
+        self.datareader = DataReaderKITTI(data_root=self.root)
         self.cam_proj = CamProj(self.datareader, batch_size=1)
         self.dilate_struct = np.ones((35, 35))
     
@@ -45,9 +47,9 @@ class KittiRawLidar(Kitti):
         # loads depth map D from lidar file
         ### This function is the same as in bts_dataloader __getitem__
         assert os.path.exists(file), "file not found: {}".format(file)
-        wanted_ftype_list = ['rgb', 'calib', 'T_rgb', 'lidar']
+        wanted_ftype_list = ['calib', 'lidar']
         ntp = self.datareader.ffinder.ntp_from_fname(file, 'lidar')
-        data_dict = self.datareader.read_datadict_from_ntp(sample_ntp, wanted_ftype_list)
+        data_dict = self.datareader.read_datadict_from_ntp(ntp, wanted_ftype_list)
         velo = data_dict['lidar']
         K_unit = data_dict['calib'].K_unit
         extr_cam_li = data_dict['calib'].P_cam_li
@@ -57,6 +59,28 @@ class KittiRawLidar(Kitti):
         depth_gt[depth_gt == 0] = -1. ## this is to be consistent with KittiDepthLoader in utils.py
         return depth_gt
     
+    def __getitem__(self, index):
+        image_path, depth_path = self._parse_path(index)
+        item_name = image_path.split("/")[-1].split(".")[0]
+
+        image, depth = self._fetch_data(image_path, depth_path)
+        image, depth, extra_dict = self.preprocess(image, depth, image_path)
+        image = torch.from_numpy(np.ascontiguousarray(image)).float()
+
+        output_dict = dict(image=image,
+                           fn=str(item_name),
+                           image_path=image_path,
+                           n=self.get_length())
+
+        if depth is not None:
+            output_dict['target'] = torch.from_numpy(np.ascontiguousarray(depth)).float()
+            output_dict['target_path'] = depth_path
+
+        if extra_dict is not None:
+            output_dict.update(**extra_dict)
+
+        return output_dict
+
     def _tr_preprocess(self, image, depth, image_path):
         ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops
         ntp = self.datareader.ffinder.ntp_from_fname(image_path, 'rgb')
@@ -122,8 +146,8 @@ class KittiRawLidar(Kitti):
         mask_gt = depth > 0
         mask = binary_closing(mask_gt, self.dilate_struct)
         ## create channel dimension at the end (does not expand depth here to be consistent with original dorn)
-        mask_gt = np.expand_dims(mask_gt, axis=2)
-        mask = np.expand_dims(mask, axis=2)
+        mask_gt = np.expand_dims(mask_gt, axis=0)
+        mask = np.expand_dims(mask, axis=0)
         ### Minghan: update cam_info according to cam_ops
         cam_info = seq_ops_on_cam_info(cam_info, cam_ops)
         extra_dict = {"cam_info": cam_info, "mask": mask, "mask_gt": mask_gt }

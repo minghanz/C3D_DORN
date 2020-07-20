@@ -22,6 +22,7 @@ sys.path.append("../../../")
 from c3d.c3d_loss import C3DLoss
 from c3d.utils_general.vis import overlay_dep_on_rgb
 import time
+# import cv2
 
 class DepthPredModel(nn.Module):
 
@@ -52,7 +53,7 @@ class DepthPredModel(nn.Module):
             self.criterion = OrdinalRegressionLoss(ord_num, beta, discretization)
             self.criterion2 = C3DLoss()
             self.criterion2.parse_opts(f_input=path_of_c3d_cfg)
-            # self.criterion2.cuda() ### ? not sure whether this is needed
+            self.criterion2.cuda() ### ? not sure whether this is needed
 
     def optimizer_params(self):
         # group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters())},
@@ -100,7 +101,7 @@ class DepthPredModel(nn.Module):
 
         prob_train, prob, label = self.regression_layer(feat)
         if self.training:
-            loss = self.criterion(prob_train, target)
+            loss_dorn = self.criterion(prob_train, target)
             if self.flag_use_c3d:
                 if self.discretization == "SID":
                     t0 = torch.exp(np.log(self.beta) * label.float() / self.ord_num)
@@ -110,8 +111,25 @@ class DepthPredModel(nn.Module):
                     t1 = 1.0 + (self.beta - 1.0) * (label.float() + 1) / self.ord_num
                 depth = (t0 + t1) / 2 - self.gamma
                 target_bchw = torch.unsqueeze(target, dim=1)
-                loss_c3d = self.criterion2(image, depth, target_bchw, mask, mask_gt, cam_info)
-                loss = loss - 1e-5* loss_c3d ### TODO: weight
+                target_bchw[target_bchw<0] = 0
+                depth_bchw = torch.unsqueeze(depth, dim=1)
+                # depth_np = depth_bchw.cpu().numpy()
+                # gt_np = target_bchw.cpu().numpy()
+                # mask_np = mask.cpu().numpy()
+                # mask_gt_np = mask_gt.cpu().numpy()
+                # print(mask_gt_np.shape)
+                # print(mask_np.shape)
+                # for i in range(depth_np.shape[0]):
+                #     cv2.imwrite("pred_{}.png".format(i), depth_np[i].transpose(1,2,0).astype(np.uint8))
+                #     cv2.imwrite("gt_{}.png".format(i), gt_np[i].transpose(1,2,0).astype(np.uint8))
+                #     cv2.imwrite("mask_pred_{}.png".format(i), mask_np[i].transpose(1,2,0).astype(np.uint8)*255)
+                #     cv2.imwrite("mask_gt_{}.png".format(i), mask_gt_np[i].transpose(1,2,0).astype(np.uint8)*255)
+
+                loss_c3d = self.criterion2(image, depth_bchw, target_bchw, mask, mask_gt, cam_info)
+                loss = loss_dorn - 1e-3* loss_c3d ### TODO: weight
+                return loss, loss_dorn, loss_c3d
+            else:
+                return loss_dorn, loss_dorn, torch.zeros_like(loss_dorn)
             return loss
 
         if self.discretization == "SID":

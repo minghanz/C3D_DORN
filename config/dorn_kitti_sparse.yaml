@@ -17,10 +17,10 @@ model:
     pretrained: True
     path_of_c3d_cfg: "./config/c3d_config.txt"
 data:
-  name: "Kitti"
+  name: ["KittiRawLidar", "Kitti"]
   # split: ["trainval", "selected_val"]
   split: ["trainsparse", "trainval"]
-  path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
+  path: '/media/sda1/minghanz/datasets/kitti/kitti_data'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]

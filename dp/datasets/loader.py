@@ -86,7 +86,13 @@ def collate_fn(batch):
 
 
 def build_loader(config, is_train=True, world_size=1, distributed=False):
-    dataset = _get_dataset(config['data']['name'])(config=config["data"], is_train=is_train)
+    if isinstance(config['data']['name'], list):
+        if is_train:
+            dataset = _get_dataset(config['data']['name'][0])(config=config["data"], is_train=is_train)
+        else:
+            dataset = _get_dataset(config['data']['name'][1])(config=config["data"], is_train=is_train)
+    else:
+        dataset = _get_dataset(config['data']['name'])(config=config["data"], is_train=is_train)
 
     sampler = None
     batch_size = config['solver']['batch_size'] if is_train else world_size

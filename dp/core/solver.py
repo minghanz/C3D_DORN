@@ -203,7 +203,11 @@ class Solver(object):
         :return:
         """
         self.iteration += 1
-        loss = self.model(**kwargs)
+        # loss = self.model(**kwargs)
+        loss, loss_dorn, loss_c3d = self.model(**kwargs)
+        loss_dorn /= self.step_decay
+        loss_c3d /= self.step_decay
+
         loss /= self.step_decay
 
         # backward
@@ -224,7 +228,10 @@ class Solver(object):
             reduced_loss = reduce_tensor(loss.data, self.world_size)
         else:
             reduced_loss = loss.data
-        return reduced_loss
+            reduced_loss_dorn = loss_dorn.data
+            reduced_loss_c3d = loss_c3d.data
+        # return reduced_loss
+        return reduced_loss, reduced_loss_dorn, reduced_loss_c3d
 
     def step_no_grad(self, **kwargs):
         with torch.no_grad():

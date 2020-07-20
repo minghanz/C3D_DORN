@@ -65,8 +65,12 @@ else:
     solver.init_from_scratch(config)
     if is_main_process:
         exp_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())
-        snap_dir = os.path.join(config["snap"]["path"], config['data']['name'],
-                                config['model']['name'], exp_time)
+        if isinstance(config['data']['name'], list):
+            snap_dir = os.path.join(config["snap"]["path"], config['data']['name'][0],
+                                    config['model']['name'], exp_time)
+        else:
+            snap_dir = os.path.join(config["snap"]["path"], config['data']['name'],
+                                    config['model']['name'], exp_time)
         if not os.path.exists(snap_dir):
             os.makedirs(snap_dir)
 
@@ -109,7 +113,8 @@ for epoch in range(solver.epoch + 1, config['solver']['epochs'] + 1):
         t_end = time.time()
         io_time = t_end - t_start
         t_start = time.time()
-        loss = solver.step(**filtered_kwargs)
+        # loss = solver.step(**filtered_kwargs)
+        loss, loss_dorn, loss_c3d = solver.step(**filtered_kwargs)
         t_end = time.time()
         inf_time = t_end - t_start
         loss_meter.update(loss)
@@ -118,8 +123,10 @@ for epoch in range(solver.epoch + 1, config['solver']['epochs'] + 1):
             print_str = '[Train] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \
                         + ' Iter{}/{}:'.format(idx + 1, niter_per_epoch) \
                         + ' lr=%.8f' % solver.get_learning_rates()[0] \
-                        + ' losses=%.2f' % loss.item() \
+                        + ' loss=%.2f' % loss.item() \
                         + '(%.2f)' % loss_meter.mean() \
+                        + ' loss_dorn=%.2f' % loss_dorn.item() \
+                        + ' loss_c3d=%.2f' % loss_c3d.item() \
                         + ' IO:%.2f' % io_time \
                         + ' Inf:%.2f' % inf_time
             pbar.set_description(print_str, refresh=False)

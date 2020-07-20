@@ -15,7 +15,7 @@ This is a distributed training framework for supervised depth prediction based o
 
 
 # Installation
-
+conda install -c conda-forge future ruamel.yaml nvidia-apex
 
 # Dataset
 

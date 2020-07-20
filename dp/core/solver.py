@@ -225,6 +225,8 @@ class Solver(object):
 
         if self.distributed:
             reduced_loss = reduce_tensor(loss.data, self.world_size)
+            reduced_loss_dorn = reduce_tensor(loss_dorn.data, self.world_size)
+            reduced_loss_c3d = reduce_tensor(loss_c3d.data, self.world_size)
         else:
             reduced_loss = loss.data
             reduced_loss_dorn = loss_dorn.data

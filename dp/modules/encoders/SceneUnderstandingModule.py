@@ -35,7 +35,9 @@ class FullImageEncoder(nn.Module):
         # print('# x4 size:', x4.size())
         x4 = x4.view(-1, 512, 1, 1)
         # print('# x4 size:', x4.size())
-        x5 = self.conv1(x4)
+        ### Minghan: This change is consistent with official DORN implementation: https://github.com/hufu6371/DORN/blob/ce9ee7b9f6560d964436db97e02990fca7fd68b6/models/KITTI/deploy.prototxt#L6806
+        # x5 = self.conv1(x4)
+        x5 = self.relu(self.conv1(x4))
         # out = self.upsample(x5)
         return x5
 

@@ -56,12 +56,13 @@ class DepthPredModel(nn.Module):
             self.criterion2.cuda() ### ? not sure whether this is needed
 
     def optimizer_params(self):
-        # group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters())},
-        #                 {"params": filter(lambda p: p.requires_grad, self.SceneUnderstandingModule.parameters()),
-        #                  "lr": 10.0}]
-        group_params = [
+        group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), 
+                         "lr": 1.0},
                         {"params": filter(lambda p: p.requires_grad, self.SceneUnderstandingModule.parameters()),
                          "lr": 10.0}]
+        # group_params = [
+        #                 {"params": filter(lambda p: p.requires_grad, self.SceneUnderstandingModule.parameters()),
+        #                  "lr": 10.0}]
         return group_params
 
     # def forward(self, image, target=None):

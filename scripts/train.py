@@ -135,6 +135,10 @@ for epoch in range(solver.epoch + 1, config['solver']['epochs'] + 1):
     if is_main_process:
         snap_name = os.path.join(snap_dir, 'epoch-{}.pth'.format(epoch))
         solver.save_checkpoint(snap_name)
+        ### Minghan: delete the last one to save space
+        if epoch > 2 and epoch % 5 != 1:
+            last_snap_name = os.path.join(snap_dir, 'epoch-{}.pth'.format(epoch-1))
+            os.remove(last_snap_name)
 
     # validation
     if is_main_process:

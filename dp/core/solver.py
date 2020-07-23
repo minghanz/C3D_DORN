@@ -147,7 +147,7 @@ class Solver(object):
         self.config = continue_state_object['config']
         self._build_environ()
         self.model = _get_model(self.config)
-        self.filtered_keys = [p.name for p in inspect.signature(self.model).parameters.values()]
+        self.filtered_keys = [p.name for p in inspect.signature(self.model.forward).parameters.values()]
         # model_params = filter(lambda p: p.requires_grad, self.model.parameters())
         model_params = []
         for params in self.model.optimizer_params():

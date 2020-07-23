@@ -85,13 +85,19 @@ class Kitti(BaseDataset):
         return image, depth, None
 
     def _te_preprocess(self, image, depth):
+        ### for evaluating on full image
+        ### Minghan: this is only applicable if batch_size=1 for evaluation, because raw full images in KITTI are not of exactly the same size
+        depth_full = depth.copy()
+        image_full = image.copy()
+        image_full = np.array(image_full).astype(np.float32)
+
         crop_h, crop_w = self.config["te_crop_size"]
         # resize
         W, H = image.size
         dH, dW = depth.shape
 
         assert W == dW and H == dH, \
-            "image shape should be same with depth, but image shape is {}, depth shape is {}".format((H, W), (dH, dW))
+            "image shape should be same with depth, but image shape is {}, depth shape is {}".format((H, W), (dH, dW))       
 
         # scale_h, scale_w = max(crop_h/H, 1.0), max(crop_w/W, 1.0)
         # scale = max(scale_h, scale_w)
@@ -106,11 +112,42 @@ class Kitti(BaseDataset):
         # print("corp dh = {}, crop dw = {}".format(crop_dh, crop_dw))
         # depth = cv2.resize(depth, (W, H), cv2.INTER_LINEAR)
 
-        # center crop
-        x = (W - crop_w) // 2
-        y = (H - crop_h) // 2
-        dx = (dW - crop_dw) // 2
-        dy = (dH - crop_dh) // 2
+        assert crop_dh == crop_h, "{} {}".format(crop_dh, crop_h)
+        assert crop_dw == crop_w, "{} {}".format(crop_dw, crop_w)
+        crop_mode = self.config["te_crop_mode"]
+        if crop_mode == "center":
+            # center crop
+            x = (W - crop_w) // 2
+            y = (H - crop_h) // 2
+            dx = (dW - crop_dw) // 2
+            dy = (dH - crop_dh) // 2
+        elif crop_mode == "kb_crop":
+            ### this mode actually cannot be used because DORN requires fixed size input due to fc layers
+            assert crop_w == 1216, crop_w
+            assert crop_h == 352, crop_h
+            
+            x = (W - crop_w) // 2
+            y = H - crop_h
+            dx = (dW - crop_dw) // 2
+            dy = dH - crop_dh
+        elif crop_mode == "bottom_left":
+            x = 0
+            y = H - crop_h
+            dx = 0
+            dy = dH - crop_dh
+        elif crop_mode == "bottom_right":
+            x = W - crop_w
+            y = H - crop_h
+            dx = dW - crop_dw
+            dy = dH - crop_dh
+        elif crop_mode == "random":
+            x = random.randint(0, W - crop_w)
+            y = random.randint(0, H - crop_h)
+            dx = random.randint(0, dW - crop_dw)
+            dy = random.randint(0, dH - crop_dh)
+        else: 
+            raise ValueError("crop_mode {} not recognized".format(crop_mode))
+
 
         image = image.crop((x, y, x + crop_w, y + crop_h))
         depth = depth[dy:dy + crop_dh, dx:dx + crop_dw]
@@ -123,5 +160,8 @@ class Kitti(BaseDataset):
         image = image.transpose(2, 0, 1)
 
         output_dict = {"image_n": image_n}
+
+        ### Minghan: save full image for future reference
+        output_dict.update({"depth_full": depth_full, "image_full": image_full})
 
         return image, depth, output_dict

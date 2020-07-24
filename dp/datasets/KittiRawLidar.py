@@ -39,8 +39,6 @@ class KittiRawLidar(Kitti):
     def __init__(self, config, is_train=True, image_loader=PILLoader, depth_loader=None):
         super().__init__(config, is_train, image_loader, depth_loader)
 
-        self.datareader = DataReaderKITTI(data_root=self.root)
-        self.cam_proj = CamProj(self.datareader, batch_size=1)
         self.dilate_struct = np.ones((35, 35))
     
     def depth_loader(self, file):
@@ -58,28 +56,6 @@ class KittiRawLidar(Kitti):
 
         depth_gt[depth_gt == 0] = -1. ## this is to be consistent with KittiDepthLoader in utils.py
         return depth_gt
-    
-    def __getitem__(self, index):
-        image_path, depth_path = self._parse_path(index)
-        item_name = image_path.split("/")[-1].split(".")[0]
-
-        image, depth = self._fetch_data(image_path, depth_path)
-        image, depth, extra_dict = self.preprocess(image, depth, image_path)
-        image = torch.from_numpy(np.ascontiguousarray(image)).float()
-
-        output_dict = dict(image=image,
-                           fn=str(item_name),
-                           image_path=image_path,
-                           n=self.get_length())
-
-        if depth is not None:
-            output_dict['target'] = torch.from_numpy(np.ascontiguousarray(depth)).float()
-            output_dict['target_path'] = depth_path
-
-        if extra_dict is not None:
-            output_dict.update(**extra_dict)
-
-        return output_dict
 
     def _tr_preprocess(self, image, depth, image_path):
         ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops

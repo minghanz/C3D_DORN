@@ -118,6 +118,7 @@ def build_loader(config, is_train=True, world_size=1, distributed=False):
                             drop_last=False,
                             shuffle=False,
                             pin_memory=False,
-                            sampler=sampler)
+                            sampler=sampler,
+                            collate_fn=collate_fn)  ### Minghan: add collate_fn here to pass cam_info
 
     return loader, sampler, niters_per_epoch

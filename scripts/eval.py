@@ -25,7 +25,9 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
 # sys.path.append(os.path.abspath(".."))
 sys.path.insert(0, os.path.abspath(".."))  
 sys.path.insert(0, os.path.abspath("../../"))   # for c3d
-from c3d.utils_general.eval import eval_preprocess
+from c3d.utils_general.eval import eval_preprocess, Metrics
+from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal
+from c3d.utils.geometry import NormalFromDepthDense
 
 # running in parent dir
 os.chdir("..")
@@ -104,13 +106,21 @@ niter_test = niter_test_l
 # niter_per_epoch, niter_test = 200, 20
 
 loss_meter = AverageMeter()
-metric = build_metrics(config)
-if is_main_process:
-    writer = create_summary_writer(snap_dir)
-    visualizer = build_visualizer(config, writer)
+# metric = build_metrics(config)
+### Metrix from c3d
+metric = Metrics(d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
+# if is_main_process:
+#     writer = create_summary_writer(snap_dir)
+#     visualizer = build_visualizer(config, writer)
+
+normal_gener = NormalFromDepthDense()
 
 epoch = config['solver']['epochs']
 solver.after_epoch()
+
+header_row = '{:10s} {} {:6s} {:6s} {:6s}'.format("Iter", metric.get_header_row(), "IO", "Inf", "Cmp")
+print(header_row)
+row_fmt = '{:10s} {} {:6.2f} {:6.2f} {:6.2f}'
 
 # validation
 if is_main_process:
@@ -134,44 +144,69 @@ for idx in pbar:
     t_start = time.time()
     pred_l = solver.step_no_grad(**filtered_kwargs_l)
     pred_r = solver.step_no_grad(**filtered_kwargs_r)
-    d_pred_l = pred_l["target"][-1]
-    d_pred_r = pred_r["target"][-1]
+    d_pred_l = pred_l["target"][-1] # B*H*W
+    d_pred_r = pred_r["target"][-1] # B*H*W
 
     full_width = minibatch_l["depth_full"].shape[-1] # minibatch_l["depth_full"].shape=(B*H*W)
     pred_full = compose_preds(d_pred_l, d_pred_r, full_width)
-    pred_kb_crop = kb_crop_preds(pred_full)
-    pred_to_eval = dict()
-    pred_to_eval["target"] = []
-    gt_to_eval = dict()
-    gt_to_eval["target"] = []
-    for ib in range(pred_kb_crop.shape[0]):
-        depth_pred_masked, depth_gt_masked = eval_preprocess(pred_kb_crop[ib], minibatch_l["depth_full"][ib], d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
-        pred_to_eval["target"].append(depth_pred_masked)
-        gt_to_eval["target"].append(depth_gt_masked)
-    pred_to_eval["target"] = [torch.stack(pred_to_eval["target"], dim=0)]
-    gt_to_eval["target"] = torch.stack(gt_to_eval["target"], dim=0)
+    pred_kb_crop = kb_crop_preds(pred_full) # B*H*W
 
     t_end = time.time()
     inf_time = t_end - t_start
 
     t_start = time.time()
     # metric.compute_metric(pred, filtered_kwargs)
-    ### Minghan: use postprocessed items to be strictly aligned with quantitative definition
-    metric.compute_metric(pred_to_eval, gt_to_eval)
+    # ### Minghan: use postprocessed items to be strictly aligned with quantitative definition
+    # pred_to_eval = dict()
+    # pred_to_eval["target"] = []
+    # gt_to_eval = dict()
+    # gt_to_eval["target"] = []
+    # for ib in range(pred_kb_crop.shape[0]):
+    #     depth_pred_masked, depth_gt_masked = eval_preprocess(pred_kb_crop[ib], minibatch_l["depth_full"][ib], d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
+    #     pred_to_eval["target"].append(depth_pred_masked)
+    #     gt_to_eval["target"].append(depth_gt_masked)
+    # pred_to_eval["target"] = [torch.stack(pred_to_eval["target"], dim=0)]
+    # gt_to_eval["target"] = torch.stack(gt_to_eval["target"], dim=0)
+    # metric.compute_metric(pred_to_eval, gt_to_eval)
+    pred_crop_hw = pred_kb_crop[0]
+    gt_full_hw = minibatch_l["depth_full"][0]
+    metric.compute_metric(pred_crop_hw, gt_full_hw)
     t_end = time.time()
     cmp_time = t_end - t_start
 
+    ### visualize predictions
+    vis_pred = vis_depth(pred_kb_crop)
+    vis_pred = uint8_np_from_img_tensor(vis_pred)
+    vis_gt = vis_depth(minibatch_l["depth_full"])
+    vis_gt = uint8_np_from_img_tensor(vis_gt)
+    save_np_to_img(vis_pred, "vis/{}_pred".format(idx))
+    save_np_to_img(vis_gt, "vis/{}_gt".format(idx))
+
+    ### generate normal image
+    cam_info_kb = minibatch_l["cam_info_kb_crop"]
+    normal_pred = normal_gener(pred_kb_crop.unsqueeze(1), cam_info_kb.K)
+    vis_normal_pred = vis_normal(normal_pred)
+    vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
+    save_np_to_img(vis_normal_pred, "vis/{}_normal".format(idx))
+
+
     if is_main_process:
-        print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \
-                    + ' Iter{}/{}: '.format(idx + 1, niter_test) \
-                    + metric.get_snapshot_info() \
-                    + ' IO:%.2f' % io_time \
-                    + ' Inf:%.2f' % inf_time \
-                    + ' Cmp:%.2f' % cmp_time
+        # print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \
+        #             + ' Iter{}/{}: '.format(idx + 1, niter_test) \
+        #             + metric.get_snapshot_info() \
+        #             + ' IO:%.2f' % io_time \
+        #             + ' Inf:%.2f' % inf_time \
+        #             + ' Cmp:%.2f' % cmp_time
+
+        print_str = row_fmt.format("{}/{}".format(idx+1, niter_test), metric.get_snapshot_row(), io_time, inf_time, cmp_time)
         pbar.set_description(print_str, refresh=False)
 
     
 if is_main_process:
-    logging.info('After Epoch{}/{}, {}'.format(epoch, config['solver']['epochs'], metric.get_result_info()))
-    # writer.add_scalar("Train/loss", loss_meter.mean(), epoch)
-    metric.add_scalar(writer, tag='Test', epoch=epoch)
+    print(metric.get_header_row())
+    print(metric.get_result_row())
+
+# if is_main_process:
+#     logging.info('After Epoch{}/{}, {}'.format(epoch, config['solver']['epochs'], metric.get_result_info()))
+#     # writer.add_scalar("Train/loss", loss_meter.mean(), epoch)
+#     metric.add_scalar(writer, tag='Test', epoch=epoch)

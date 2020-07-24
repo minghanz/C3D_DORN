@@ -19,6 +19,13 @@ from PIL import Image
 from dp.datasets.base_dataset import BaseDataset
 from dp.datasets.utils import nomalize, PILLoader, KittiDepthLoader
 
+import sys
+sys.path.append("../../../")
+from c3d.utils_general.dataset_read import DataReaderKITTI
+from c3d.utils.cam_proj import CamProj, seq_ops_on_cam_info
+from c3d.utils.cam import CamCrop
+
+import torch
 
 class Kitti(BaseDataset):
 
@@ -31,13 +38,38 @@ class Kitti(BaseDataset):
             ### skip the files with no ground truth
             self.filenames = [x for x in self.filenames if "None" not in x]
 
+        self.datareader = DataReaderKITTI(data_root=self.root)
+        self.cam_proj = CamProj(self.datareader, batch_size=1)
+
     def _parse_path(self, index):
         image_path, depth_path = self.filenames[index].split()
         image_path = os.path.join(self.root, image_path)
         depth_path = os.path.join(self.root, depth_path)
         return image_path, depth_path
 
-    def _tr_preprocess(self, image, depth):
+    def __getitem__(self, index):
+        image_path, depth_path = self._parse_path(index)
+        item_name = image_path.split("/")[-1].split(".")[0]
+
+        image, depth = self._fetch_data(image_path, depth_path)
+        image, depth, extra_dict = self.preprocess(image, depth, image_path)
+        image = torch.from_numpy(np.ascontiguousarray(image)).float()
+
+        output_dict = dict(image=image,
+                           fn=str(item_name),
+                           image_path=image_path,
+                           n=self.get_length())
+
+        if depth is not None:
+            output_dict['target'] = torch.from_numpy(np.ascontiguousarray(depth)).float()
+            output_dict['target_path'] = depth_path
+
+        if extra_dict is not None:
+            output_dict.update(**extra_dict)
+
+        return output_dict
+
+    def _tr_preprocess(self, image, depth, image_path):
         crop_h, crop_w = self.config["tr_crop_size"]
         # resize
         W, H = image.size
@@ -84,7 +116,13 @@ class Kitti(BaseDataset):
 
         return image, depth, None
 
-    def _te_preprocess(self, image, depth):
+    def _te_preprocess(self, image, depth, image_path):
+        ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops
+        ntp = self.datareader.ffinder.ntp_from_fname(image_path, 'rgb')
+        ntp_cam = self.cam_proj.dataset_reader.ffinder.ntp_ftype_convert(ntp, ftype='calib')
+        cam_info = self.cam_proj.prepare_cam_info(key=ntp_cam)
+        cam_ops = []
+
         ### for evaluating on full image
         ### Minghan: this is only applicable if batch_size=1 for evaluation, because raw full images in KITTI are not of exactly the same size
         depth_full = depth.copy()
@@ -161,7 +199,23 @@ class Kitti(BaseDataset):
 
         output_dict = {"image_n": image_n}
 
+        ### Minghan: log the cropping operation in cam_ops
+        cam_ops.append(CamCrop(x, y, crop_w, crop_h))
+        ### Minghan: we assume always using scale = 1
+        assert crop_h == crop_dh
+        assert crop_w == crop_dw
+        assert scale == 1
+        assert x == dx
+        assert y == dy
+
+        cam_info_img = seq_ops_on_cam_info(cam_info, cam_ops)
+        x_kb = (W - 1216) // 2
+        y_kb = H - 352
+        cam_info_kb_crop = seq_ops_on_cam_info(cam_info, [CamCrop(x_kb, y_kb, 1216, 352)] )
+
         ### Minghan: save full image for future reference
-        output_dict.update({"depth_full": depth_full, "image_full": image_full})
+        ### Minghan: note that "cam_info_full" is likely not able to be batched because the shape of full images are not the same. 
+        ###          However the testing dataloader is likely to have batch size 1 so it is okay.
+        output_dict.update({"cam_info": cam_info_img, "cam_info_kb_crop": cam_info_kb_crop, "cam_info_full": cam_info, "depth_full": depth_full, "image_full": image_full})
 
         return image, depth, output_dict

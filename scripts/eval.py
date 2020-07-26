@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
 from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal
 from c3d.utils.geometry import NormalFromDepthDense
+from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write
 
 # running in parent dir
 os.chdir("..")
@@ -62,6 +63,8 @@ if args.resumed:
     continue_state_object = torch.load(args.resumed,
                                        map_location=torch.device("cpu"))
     config = continue_state_object['config']
+    # ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
+    # config["data"]["path"] = '/media/sda1/minghanz/datasets/kitti/kitti_data' 
     solver.init_from_checkpoint(continue_state_object=continue_state_object)
     if is_main_process:
         snap_dir = args.resumed[:-len(args.resumed.split('/')[-1])]
@@ -148,7 +151,8 @@ for idx in pbar:
     d_pred_r = pred_r["target"][-1] # B*H*W
 
     full_width = minibatch_l["depth_full"].shape[-1] # minibatch_l["depth_full"].shape=(B*H*W)
-    pred_full = compose_preds(d_pred_l, d_pred_r, full_width)
+    full_height = minibatch_l["depth_full"].shape[-2]
+    pred_full = compose_preds(d_pred_l, d_pred_r, full_width, full_height)
     pred_kb_crop = kb_crop_preds(pred_full) # B*H*W
 
     t_end = time.time()
@@ -168,6 +172,7 @@ for idx in pbar:
     # pred_to_eval["target"] = [torch.stack(pred_to_eval["target"], dim=0)]
     # gt_to_eval["target"] = torch.stack(gt_to_eval["target"], dim=0)
     # metric.compute_metric(pred_to_eval, gt_to_eval)
+    ### remove batch dim
     pred_crop_hw = pred_kb_crop[0]
     gt_full_hw = minibatch_l["depth_full"][0]
     metric.compute_metric(pred_crop_hw, gt_full_hw)
@@ -189,6 +194,14 @@ for idx in pbar:
     vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
     save_np_to_img(vis_normal_pred, "vis/{}_normal".format(idx))
 
+    ### generate pcl (saving snapshot need a GUI environment)
+    xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+    pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
+    pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
+    pcl_write(pcd_pred, "vis/{}_pred")
+    pcl_write(pcd_gt, "vis/{}_gt")
+    pcl_vis_seq([pcd_pred], snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
+    pcl_vis_seq([pcd_gt], snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
 
     if is_main_process:
         # print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \

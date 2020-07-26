@@ -128,6 +128,7 @@ class Kitti(BaseDataset):
         depth_full = depth.copy()
         image_full = image.copy()
         image_full = np.array(image_full).astype(np.float32)
+        image_full = image_full.transpose(2, 0, 1)
 
         crop_h, crop_w = self.config["te_crop_size"]
         # resize

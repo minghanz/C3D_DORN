@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
 from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal
 from c3d.utils.geometry import NormalFromDepthDense
-from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write
+from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile
 
 # running in parent dir
 os.chdir("..")
@@ -117,6 +117,7 @@ metric = Metrics(d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_cr
 #     visualizer = build_visualizer(config, writer)
 
 normal_gener = NormalFromDepthDense()
+pcl_viewer = pcl_load_viewer_fromfile()
 
 epoch = config['solver']['epochs']
 solver.after_epoch()
@@ -198,10 +199,10 @@ for idx in pbar:
     xy1_pred = minibatch_l["cam_info_full"].xy1_grid
     pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
     pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
-    pcl_write(pcd_pred, "vis/{}_pred")
-    pcl_write(pcd_gt, "vis/{}_gt")
-    pcl_vis_seq([pcd_pred], snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
-    pcl_vis_seq([pcd_gt], snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
+    pcl_write(pcd_pred[0], "vis/{}_pred".format(idx))
+    pcl_write(pcd_gt[0], "vis/{}_gt".format(idx))
+    pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
+    pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
 
     if is_main_process:
         # print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \

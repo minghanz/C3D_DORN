@@ -21,7 +21,7 @@ from dp.datasets.utils import nomalize, PILLoader, KittiDepthLoader
 
 import sys
 sys.path.append("../../../")
-from c3d.utils_general.dataset_read import DataReaderKITTI
+from c3d.utils_general.dataset_read import DataReaderKITTI, DataReaderVKITTI2
 from c3d.utils.cam_proj import CamProj, seq_ops_on_cam_info
 from c3d.utils.cam import CamCrop
 
@@ -38,13 +38,19 @@ class Kitti(BaseDataset):
             ### skip the files with no ground truth
             self.filenames = [x for x in self.filenames if "None" not in x]
 
+        self.init_c3d()
+
+    def init_c3d(self):
         self.datareader = DataReaderKITTI(data_root=self.root)
         self.cam_proj = CamProj(self.datareader, batch_size=1)
 
     def _parse_path(self, index):
         image_path, depth_path = self.filenames[index].split()
         image_path = os.path.join(self.root, image_path)
-        depth_path = os.path.join(self.root, depth_path)
+        if depth_path != "None":
+            depth_path = os.path.join(self.root, depth_path)
+        else:
+            depth_path = None
         return image_path, depth_path
 
     def __getitem__(self, index):
@@ -119,13 +125,17 @@ class Kitti(BaseDataset):
     def _te_preprocess(self, image, depth, image_path):
         ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops
         ntp = self.datareader.ffinder.ntp_from_fname(image_path, 'rgb')
-        ntp_cam = self.cam_proj.dataset_reader.ffinder.ntp_ftype_convert(ntp, ftype='calib')
-        cam_info = self.cam_proj.prepare_cam_info(key=ntp_cam)
+        if 'calib' in self.datareader.ffinder.preload_ftypes:
+            ntp_cam = self.cam_proj.dataset_reader.ffinder.ntp_ftype_convert(ntp, ftype='calib')
+            cam_info = self.cam_proj.prepare_cam_info(key=ntp_cam)
+        else:
+            inex = self.datareader.read_from_ntp(ntp, ftype='calib')
+            cam_info = self.cam_proj.prepare_cam_info(intr=inex)
         cam_ops = []
 
         ### for evaluating on full image
         ### Minghan: this is only applicable if batch_size=1 for evaluation, because raw full images in KITTI are not of exactly the same size
-        depth_full = depth.copy()
+        depth_full = depth.copy() if depth is not None else None
         image_full = image.copy()
         image_full = np.array(image_full).astype(np.float32)
         image_full = image_full.transpose(2, 0, 1)
@@ -133,7 +143,11 @@ class Kitti(BaseDataset):
         crop_h, crop_w = self.config["te_crop_size"]
         # resize
         W, H = image.size
-        dH, dW = depth.shape
+        if depth is not None:
+            dH, dW = depth.shape
+        else:
+            dH = H
+            dW = W
 
         assert W == dW and H == dH, \
             "image shape should be same with depth, but image shape is {}, depth shape is {}".format((H, W), (dH, dW))       
@@ -189,7 +203,8 @@ class Kitti(BaseDataset):
 
 
         image = image.crop((x, y, x + crop_w, y + crop_h))
-        depth = depth[dy:dy + crop_dh, dx:dx + crop_dw]
+        if depth is not None:
+            depth = depth[dy:dy + crop_dh, dx:dx + crop_dw]
         image_n = image_n.crop((dx, dy, dx + crop_dw, dy + crop_dh))
 
         # normalize

@@ -60,8 +60,13 @@ class KittiRawLidar(Kitti):
     def _tr_preprocess(self, image, depth, image_path):
         ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops
         ntp = self.datareader.ffinder.ntp_from_fname(image_path, 'rgb')
-        ntp_cam = self.cam_proj.dataset_reader.ffinder.ntp_ftype_convert(ntp, ftype='calib')
-        cam_info = self.cam_proj.prepare_cam_info(key=ntp_cam)
+        if 'calib' in self.datareader.ffinder.preload_ftypes:
+            ntp_cam = self.cam_proj.dataset_reader.ffinder.ntp_ftype_convert(ntp, ftype='calib')
+            cam_info = self.cam_proj.prepare_cam_info(key=ntp_cam)
+        else:
+            inex = self.datareader.read_from_ntp(ntp, ftype='calib')
+            cam_info = self.cam_proj.prepare_cam_info(intr=inex)
+            
         cam_ops = []
 
         crop_h, crop_w = self.config["tr_crop_size"]

@@ -26,9 +26,9 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
 sys.path.insert(0, os.path.abspath(".."))  
 sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
-from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal
+from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np
 from c3d.utils.geometry import NormalFromDepthDense
-from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile
+# from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile
 
 # running in parent dir
 os.chdir("..")
@@ -63,8 +63,18 @@ if args.resumed:
     continue_state_object = torch.load(args.resumed,
                                        map_location=torch.device("cpu"))
     config = continue_state_object['config']
-    # ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
-    # config["data"]["path"] = '/media/sda1/minghanz/datasets/kitti/kitti_data' 
+    ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
+    config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data' 
+    # config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/vKITTI2'  ### for vkitti2 dataset
+    ### Minghan: change to the data split you want to test on
+    # config["data"]["split"][1] = "eval_visualize"
+    # config["data"]["split"][1] = "eval_visualize_vkitti2"
+    # ### Minghan: use vkitti2 as evaluation
+    # if not isinstance(config["data"]["name"], list):
+    #     config["data"]["name"] = [config["data"]["name"]]
+    #     config["data"]["name"].append("vKitti2")
+    # else:
+    #     config["data"]["name"][1] = "vKitti2"
     solver.init_from_checkpoint(continue_state_object=continue_state_object)
     if is_main_process:
         snap_dir = args.resumed[:-len(args.resumed.split('/')[-1])]
@@ -112,12 +122,14 @@ loss_meter = AverageMeter()
 # metric = build_metrics(config)
 ### Metrix from c3d
 metric = Metrics(d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
+# metric = Metrics(d_min=1e-3, d_max=80, shape_unify=None, eval_crop="vkitti2", adjust_mean=False, batch_adjust_mean=2.66)  ### for vkitti2
+mean_tracker = AverageMeter()
 # if is_main_process:
 #     writer = create_summary_writer(snap_dir)
 #     visualizer = build_visualizer(config, writer)
 
 normal_gener = NormalFromDepthDense()
-pcl_viewer = pcl_load_viewer_fromfile()
+# pcl_viewer = pcl_load_viewer_fromfile()
 
 epoch = config['solver']['epochs']
 solver.after_epoch()
@@ -176,33 +188,60 @@ for idx in pbar:
     ### remove batch dim
     pred_crop_hw = pred_kb_crop[0]
     gt_full_hw = minibatch_l["depth_full"][0]
-    metric.compute_metric(pred_crop_hw, gt_full_hw)
+    extra_dict = metric.compute_metric(pred_crop_hw, gt_full_hw)
+    # extra_dict = metric.compute_metric(pred_full[0], gt_full_hw)     # for vkitti2
     t_end = time.time()
     cmp_time = t_end - t_start
 
-    ### visualize predictions
-    vis_pred = vis_depth(pred_kb_crop)
-    vis_pred = uint8_np_from_img_tensor(vis_pred)
-    vis_gt = vis_depth(minibatch_l["depth_full"])
-    vis_gt = uint8_np_from_img_tensor(vis_gt)
-    save_np_to_img(vis_pred, "vis/{}_pred".format(idx))
-    save_np_to_img(vis_gt, "vis/{}_gt".format(idx))
+    ### visualize debug info
+    mask = extra_dict['mask']
+    mean_tracker.update(extra_dict['mean_pred']/extra_dict['mean_gt'])
+    # img_mask = uint8_np_from_img_tensor(mask.unsqueeze(0))
+    # save_np_to_img(img_mask, "vis/{}_mask".format(idx))
 
-    ### generate normal image
-    cam_info_kb = minibatch_l["cam_info_kb_crop"]
-    normal_pred = normal_gener(pred_kb_crop.unsqueeze(1), cam_info_kb.K)
-    vis_normal_pred = vis_normal(normal_pred)
-    vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
-    save_np_to_img(vis_normal_pred, "vis/{}_normal".format(idx))
+    # gt_5 = gt_full_hw <= 5
+    # gt_10 = gt_full_hw <= 10
+    # gt_20 = gt_full_hw <= 20
+    # gt_51020 = torch.stack([gt_5, gt_10, gt_20], 0)
+    # img_mask = uint8_np_from_img_tensor(gt_51020)
+    # save_np_to_img(img_mask, "vis/{}_mask_gt51020".format(idx))
+    
+    # gt_5 = pred_full <= 5
+    # gt_10 = pred_full <= 10
+    # gt_20 = pred_full <= 20
+    # gt_51020 = torch.cat([gt_5, gt_10, gt_20], 0)
+    # img_mask = uint8_np_from_img_tensor(gt_51020)
+    # save_np_to_img(img_mask, "vis/{}_mask_pred51020".format(idx))
 
-    ### generate pcl (saving snapshot need a GUI environment)
-    xy1_pred = minibatch_l["cam_info_full"].xy1_grid
-    pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
-    pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
-    pcl_write(pcd_pred[0], "vis/{}_pred".format(idx))
-    pcl_write(pcd_gt[0], "vis/{}_gt".format(idx))
-    pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
-    pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
+    # ### visualize rgb image
+    # img_full = minibatch_l["image_full"][0]
+    # img_kb_crop = kb_crop_preds(img_full)
+    # img_full_np = uint8_np_from_img_tensor(img_full)
+    # save_np_to_img(img_full_np, "vis/{}_rgb".format(idx))
+
+    # ### visualize predictions
+    # vis_pred = vis_depth(pred_full)
+    # vis_pred = uint8_np_from_img_tensor(vis_pred)
+    # vis_gt = vis_depth(minibatch_l["depth_full"])
+    # vis_gt = uint8_np_from_img_tensor(vis_gt)
+    # save_np_to_img(vis_pred, "vis/{}_pred".format(idx))
+    # save_np_to_img(vis_gt, "vis/{}_gt".format(idx))
+
+    # ### generate normal image
+    # cam_info_kb = minibatch_l["cam_info_kb_crop"]
+    # normal_pred = normal_gener(pred_kb_crop.unsqueeze(1), cam_info_kb.K)
+    # vis_normal_pred = vis_normal(normal_pred)
+    # vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
+    # save_np_to_img(vis_normal_pred, "vis/{}_normal".format(idx))
+
+    # ### generate pcl (saving snapshot need a GUI environment)
+    # xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+    # pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
+    # pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
+    # pcl_write(pcd_pred[0], "vis/{}_pred".format(idx))
+    # # pcl_write(pcd_gt[0], "vis/{}_gt".format(idx))
+    # # pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
+    # # pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
 
     if is_main_process:
         # print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \
@@ -219,6 +258,8 @@ for idx in pbar:
 if is_main_process:
     print(metric.get_header_row())
     print(metric.get_result_row())
+
+print(mean_tracker.mean())
 
 # if is_main_process:
 #     logging.info('After Epoch{}/{}, {}'.format(epoch, config['solver']['epochs'], metric.get_result_info()))

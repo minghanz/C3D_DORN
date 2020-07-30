@@ -61,5 +61,5 @@ class OrdinalRegressionLayer(nn.Module):
 
         prob = F.log_softmax(x, dim=1).view(N, C, H, W)
         ord_prob = F.softmax(x, dim=1)[:, 0, :, :, :]
-        ord_label = torch.sum((ord_prob > 0.5), dim=1)
+        ord_label = torch.sum((ord_prob > 0.5), dim=1) - 1
         return prob, ord_prob, ord_label

@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
 from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np
 from c3d.utils.geometry import NormalFromDepthDense
-# from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile
+from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile     ## need to install pcl
 
 # running in parent dir
 os.chdir("..")
@@ -47,6 +47,16 @@ parser = argparse.ArgumentParser(description='Training script')
 parser.add_argument('-c', '--config', type=str)
 parser.add_argument('-r', '--resumed', type=str, default=None, required=False)
 parser.add_argument("--local_rank", default=0, type=int)
+### options for outputing visualization
+parser.add_argument("--vpath", type=str, default="vis")
+parser.add_argument("--vrgb", action="store_true", help="visualize rgb input images")
+parser.add_argument("--vdepth", action="store_true", help="visualize depth gt and predictions")
+parser.add_argument("--vmask", action="store_true", help="visualize which pixels are counted in quantitative results")
+parser.add_argument("--vrange", action="store_true", help="visualize range mask image which shows rough distance distribution")
+parser.add_argument("--vnormal", action="store_true", help="visualize surface normal predictions")
+parser.add_argument("--save-pcl-pred", action="store_true", help="save point cloud prediction to file (need install pcl library)")
+parser.add_argument("--save-pcl-gt", action="store_true", help="save point cloud gt to file (need install pcl library)")
+parser.add_argument("--vpcl", action="store_true", help="visualize pcl as an image (need install pcl library)")
 
 args = parser.parse_args()
 
@@ -64,17 +74,10 @@ if args.resumed:
                                        map_location=torch.device("cpu"))
     config = continue_state_object['config']
     ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
-    config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data' 
-    # config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/vKITTI2'  ### for vkitti2 dataset
-    ### Minghan: change to the data split you want to test on
-    # config["data"]["split"][1] = "eval_visualize"
-    # config["data"]["split"][1] = "eval_visualize_vkitti2"
-    # ### Minghan: use vkitti2 as evaluation
-    # if not isinstance(config["data"]["name"], list):
-    #     config["data"]["name"] = [config["data"]["name"]]
-    #     config["data"]["name"].append("vKitti2")
-    # else:
-    #     config["data"]["name"][1] = "vKitti2"
+    if args.config:
+        override_cfg = load_config(args.config)
+        config.update(override_cfg)
+
     solver.init_from_checkpoint(continue_state_object=continue_state_object)
     if is_main_process:
         snap_dir = args.resumed[:-len(args.resumed.split('/')[-1])]
@@ -113,6 +116,7 @@ te_loader_r, _, niter_test_r = build_loader(config_right, False, solver.world_si
 assert niter_test_l == niter_test_r, "{} {}".format(niter_test_l, niter_test_r)
 niter_test = niter_test_l
 
+dataset_name = config["data"]["name"][1]
 """
     usage: debug
 """
@@ -121,15 +125,20 @@ niter_test = niter_test_l
 loss_meter = AverageMeter()
 # metric = build_metrics(config)
 ### Metrix from c3d
-metric = Metrics(d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
-# metric = Metrics(d_min=1e-3, d_max=80, shape_unify=None, eval_crop="vkitti2", adjust_mean=False, batch_adjust_mean=2.66)  ### for vkitti2
-mean_tracker = AverageMeter()
+if dataset_name == "Kitti":
+    metric = Metrics(d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
+elif dataset_name == "vKitti2":
+    metric = Metrics(d_min=1e-3, d_max=80, shape_unify=None, eval_crop="vkitti2", adjust_mean=False, batch_adjust_mean=2.66)  ### for vkitti2
+else:
+    raise ValueError("data name {} not recognized".format(dataset_name))
+mean_tracker = AverageMeter()   ### mean_tracker is to tell whether the scale has any overall shift compared with GT depth
 # if is_main_process:
 #     writer = create_summary_writer(snap_dir)
 #     visualizer = build_visualizer(config, writer)
 
 normal_gener = NormalFromDepthDense()
-# pcl_viewer = pcl_load_viewer_fromfile()
+if args.vpcl:
+    pcl_viewer = pcl_load_viewer_fromfile()
 
 epoch = config['solver']['epochs']
 solver.after_epoch()
@@ -172,76 +181,88 @@ for idx in pbar:
     inf_time = t_end - t_start
 
     t_start = time.time()
-    # metric.compute_metric(pred, filtered_kwargs)
-    # ### Minghan: use postprocessed items to be strictly aligned with quantitative definition
-    # pred_to_eval = dict()
-    # pred_to_eval["target"] = []
-    # gt_to_eval = dict()
-    # gt_to_eval["target"] = []
-    # for ib in range(pred_kb_crop.shape[0]):
-    #     depth_pred_masked, depth_gt_masked = eval_preprocess(pred_kb_crop[ib], minibatch_l["depth_full"][ib], d_min=1e-3, d_max=80, shape_unify="kb_crop", eval_crop="garg_crop")
-    #     pred_to_eval["target"].append(depth_pred_masked)
-    #     gt_to_eval["target"].append(depth_gt_masked)
-    # pred_to_eval["target"] = [torch.stack(pred_to_eval["target"], dim=0)]
-    # gt_to_eval["target"] = torch.stack(gt_to_eval["target"], dim=0)
-    # metric.compute_metric(pred_to_eval, gt_to_eval)
     ### remove batch dim
     pred_crop_hw = pred_kb_crop[0]
+    pred_full_hw = pred_full[0]
     gt_full_hw = minibatch_l["depth_full"][0]
-    extra_dict = metric.compute_metric(pred_crop_hw, gt_full_hw)
-    # extra_dict = metric.compute_metric(pred_full[0], gt_full_hw)     # for vkitti2
+    if dataset_name == "Kitti":
+        extra_dict = metric.compute_metric(pred_crop_hw, gt_full_hw)
+    elif dataset_name == "vKitti2":
+        extra_dict = metric.compute_metric(pred_full_hw, gt_full_hw)     # for vkitti2
+    else:
+        raise ValueError("data name {} not recognized".format(dataset_name))
     t_end = time.time()
     cmp_time = t_end - t_start
 
-    ### visualize debug info
-    mask = extra_dict['mask']
     mean_tracker.update(extra_dict['mean_pred']/extra_dict['mean_gt'])
-    # img_mask = uint8_np_from_img_tensor(mask.unsqueeze(0))
-    # save_np_to_img(img_mask, "vis/{}_mask".format(idx))
 
-    # gt_5 = gt_full_hw <= 5
-    # gt_10 = gt_full_hw <= 10
-    # gt_20 = gt_full_hw <= 20
-    # gt_51020 = torch.stack([gt_5, gt_10, gt_20], 0)
-    # img_mask = uint8_np_from_img_tensor(gt_51020)
-    # save_np_to_img(img_mask, "vis/{}_mask_gt51020".format(idx))
-    
-    # gt_5 = pred_full <= 5
-    # gt_10 = pred_full <= 10
-    # gt_20 = pred_full <= 20
-    # gt_51020 = torch.cat([gt_5, gt_10, gt_20], 0)
-    # img_mask = uint8_np_from_img_tensor(gt_51020)
-    # save_np_to_img(img_mask, "vis/{}_mask_pred51020".format(idx))
+    #################################################### visualization
+    if args.vmask:
+        ### visualize mask showing pixels included in quantitative result
+        mask = extra_dict['mask']
+        img_mask = uint8_np_from_img_tensor(mask.unsqueeze(0))
+        save_np_to_img(img_mask, "{}/{}_mask".format(args.vpath, idx))
 
-    # ### visualize rgb image
-    # img_full = minibatch_l["image_full"][0]
-    # img_kb_crop = kb_crop_preds(img_full)
-    # img_full_np = uint8_np_from_img_tensor(img_full)
-    # save_np_to_img(img_full_np, "vis/{}_rgb".format(idx))
+    if args.vrange:
+        ## visualize range-indicating mask of ground truth and predictions, again it is to tell whether the scale has any overall shift compared with GT depth
+        gt_5 = gt_full_hw <= 5
+        gt_10 = gt_full_hw <= 10
+        gt_20 = gt_full_hw <= 20
+        gt_51020 = torch.stack([gt_5, gt_10, gt_20], 0)
+        img_mask = uint8_np_from_img_tensor(gt_51020)
+        save_np_to_img(img_mask, "{}/{}_mask_gt51020".format(args.vpath, idx))
+        
+        gt_5 = pred_full <= 5
+        gt_10 = pred_full <= 10
+        gt_20 = pred_full <= 20
+        gt_51020 = torch.cat([gt_5, gt_10, gt_20], 0)
+        img_mask = uint8_np_from_img_tensor(gt_51020)
+        save_np_to_img(img_mask, "{}/{}_mask_pred51020".format(args.vpath, idx))
 
-    # ### visualize predictions
-    # vis_pred = vis_depth(pred_full)
-    # vis_pred = uint8_np_from_img_tensor(vis_pred)
-    # vis_gt = vis_depth(minibatch_l["depth_full"])
-    # vis_gt = uint8_np_from_img_tensor(vis_gt)
-    # save_np_to_img(vis_pred, "vis/{}_pred".format(idx))
-    # save_np_to_img(vis_gt, "vis/{}_gt".format(idx))
+    if args.vrgb:
+        ### visualize rgb image
+        img_full = minibatch_l["image_full"][0]
+        img_kb_crop = kb_crop_preds(img_full)
+        img_full_np = uint8_np_from_img_tensor(img_full)
+        save_np_to_img(img_full_np, "{}/{}_rgb".format(args.vpath, idx))
 
-    # ### generate normal image
-    # cam_info_kb = minibatch_l["cam_info_kb_crop"]
-    # normal_pred = normal_gener(pred_kb_crop.unsqueeze(1), cam_info_kb.K)
-    # vis_normal_pred = vis_normal(normal_pred)
-    # vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
-    # save_np_to_img(vis_normal_pred, "vis/{}_normal".format(idx))
+    if args.vdepth:
+        ### visualize predictions
+        vis_pred = vis_depth(pred_full)
+        vis_pred = uint8_np_from_img_tensor(vis_pred)
+        vis_gt = vis_depth(minibatch_l["depth_full"])
+        vis_gt = uint8_np_from_img_tensor(vis_gt)
+        save_np_to_img(vis_pred, "{}/{}_pred".format(args.vpath, idx))
+        save_np_to_img(vis_gt, "{}/{}_gt".format(args.vpath, idx))
 
-    # ### generate pcl (saving snapshot need a GUI environment)
-    # xy1_pred = minibatch_l["cam_info_full"].xy1_grid
-    # pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
-    # pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
-    # pcl_write(pcd_pred[0], "vis/{}_pred".format(idx))
-    # # pcl_write(pcd_gt[0], "vis/{}_gt".format(idx))
-    # # pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_pred".format(idx)+"_{}")
-    # # pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="vis/{}_pcdvis_gt".format(idx)+"_{}")
+    if args.vnormal:
+        ### generate normal image
+        # cam_info_kb = minibatch_l["cam_info_kb_crop"]
+        # normal_pred = normal_gener(pred_kb_crop.unsqueeze(1), cam_info_kb.K)
+        cam_info_full = minibatch_l["cam_info_full"]
+        normal_pred = normal_gener(pred_full.unsqueeze(1), cam_info_full.K)
+        vis_normal_pred = vis_normal(normal_pred)
+        vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
+        save_np_to_img(vis_normal_pred, "{}/{}_normal".format(args.vpath, idx))
+
+    if args.save_pcl_pred or args.vpcl:
+        ### generate pcl (saving snapshot need a GUI environment)
+        xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+        pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
+        if args.save_pcl_pred:
+            pcl_write(pcd_pred[0], "{}/{}_pred".format(args.vpath, idx))
+        if args.vpcl:
+            pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_pred".format(args.vpath, idx)+"_{}")
+
+    if args.save_pcl_gt or args.vpcl:
+        xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+        pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
+        if args.save_pcl_gt:
+            pcl_write(pcd_gt[0], "{}/{}_gt".format(args.vpath, idx))
+        if args.vpcl:
+            pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_gt".format(args.vpath, idx)+"_{}")
+
+    ##########################################################################
 
     if is_main_process:
         # print_str = '[Test] Epoch{}/{}'.format(epoch, config['solver']['epochs']) \
@@ -259,7 +280,7 @@ if is_main_process:
     print(metric.get_header_row())
     print(metric.get_result_row())
 
-print(mean_tracker.mean())
+print("Mean pred/gt ratio:", mean_tracker.mean())
 
 # if is_main_process:
 #     logging.info('After Epoch{}/{}, {}'.format(epoch, config['solver']['epochs'], metric.get_result_info()))

@@ -1,0 +1,8 @@
+data:
+  name: [None, "Kitti"]
+  split: [None, "eval_visualize"]     # for qualitative output
+  # split: [None, "trainval"]     # for quantitative output
+  path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
+  tr_crop_size: [352, 704]
+  te_crop_size: [352, 704]
+  norm_type: "imagenet-norm"

@@ -18,6 +18,7 @@ class BaseDataset(data.Dataset):
         self.root = self.config['path']
         self.split = self.config["split"]
         self.split = self.split[0] if is_train else self.split[1]
+        self.name = self.config['name'][0] if is_train else self.config['name'][1]
         ### Minghan: if none, don't initialize the function here. Maybe they are written in the derived class
         if image_loader is not None:
             self.image_loader = image_loader

@@ -5,13 +5,15 @@ model:
   name: "dorn"
   pretrained_model:
   params:
-    ord_num: 90
+    # ord_num: 90
+    ord_num: 80
     gamma: -0.97
     beta: 90.0
     # input_size: [385, 513]
     input_size: [352, 704]
     kernel_size: 16
-    pyramid: [8, 12, 16]
+    # pyramid: [8, 12, 16]
+    pyramid: [6, 12, 18]
     batch_norm: False
     discretization: "SID"
     pretrained: True
@@ -19,6 +21,7 @@ data:
   name: "Kitti"
   # split: ["trainval", "selected_val"]
   split: ["train", "trainval"]
+  # split: ["trainsparse", "trainval"]
   path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]

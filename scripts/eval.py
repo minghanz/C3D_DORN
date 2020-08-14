@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
 from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np
 from c3d.utils.geometry import NormalFromDepthDense
-from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile     ## need to install pcl
+# from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile     ## need to install pcl
 
 # running in parent dir
 os.chdir("..")
@@ -54,9 +54,9 @@ parser.add_argument("--vdepth", action="store_true", help="visualize depth gt an
 parser.add_argument("--vmask", action="store_true", help="visualize which pixels are counted in quantitative results")
 parser.add_argument("--vrange", action="store_true", help="visualize range mask image which shows rough distance distribution")
 parser.add_argument("--vnormal", action="store_true", help="visualize surface normal predictions")
-parser.add_argument("--save-pcl-pred", action="store_true", help="save point cloud prediction to file (need install pcl library)")
-parser.add_argument("--save-pcl-gt", action="store_true", help="save point cloud gt to file (need install pcl library)")
-parser.add_argument("--vpcl", action="store_true", help="visualize pcl as an image (need install pcl library)")
+# parser.add_argument("--save-pcl-pred", action="store_true", help="save point cloud prediction to file (need install pcl library)")
+# parser.add_argument("--save-pcl-gt", action="store_true", help="save point cloud gt to file (need install pcl library)")
+# parser.add_argument("--vpcl", action="store_true", help="visualize pcl as an image (need install pcl library)")
 
 args = parser.parse_args()
 
@@ -137,8 +137,8 @@ mean_tracker = AverageMeter()   ### mean_tracker is to tell whether the scale ha
 #     visualizer = build_visualizer(config, writer)
 
 normal_gener = NormalFromDepthDense()
-if args.vpcl:
-    pcl_viewer = pcl_load_viewer_fromfile()
+# if args.vpcl:
+#     pcl_viewer = pcl_load_viewer_fromfile()
 
 epoch = config['solver']['epochs']
 solver.after_epoch()
@@ -245,22 +245,22 @@ for idx in pbar:
         vis_normal_pred = uint8_np_from_img_tensor(vis_normal_pred)
         save_np_to_img(vis_normal_pred, "{}/{}_normal".format(args.vpath, idx))
 
-    if args.save_pcl_pred or args.vpcl:
-        ### generate pcl (saving snapshot need a GUI environment)
-        xy1_pred = minibatch_l["cam_info_full"].xy1_grid
-        pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
-        if args.save_pcl_pred:
-            pcl_write(pcd_pred[0], "{}/{}_pred".format(args.vpath, idx))
-        if args.vpcl:
-            pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_pred".format(args.vpath, idx)+"_{}")
+    # if args.save_pcl_pred or args.vpcl:
+    #     ### generate pcl (saving snapshot need a GUI environment)
+    #     xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+    #     pcd_pred = pcl_from_grid_xy1_dep(xy1_pred, pred_full, minibatch_l['image_full'])
+    #     if args.save_pcl_pred:
+    #         pcl_write(pcd_pred[0], "{}/{}_pred".format(args.vpath, idx))
+    #     if args.vpcl:
+    #         pcl_vis_seq(pcd_pred, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_pred".format(args.vpath, idx)+"_{}")
 
-    if args.save_pcl_gt or args.vpcl:
-        xy1_pred = minibatch_l["cam_info_full"].xy1_grid
-        pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
-        if args.save_pcl_gt:
-            pcl_write(pcd_gt[0], "{}/{}_gt".format(args.vpath, idx))
-        if args.vpcl:
-            pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_gt".format(args.vpath, idx)+"_{}")
+    # if args.save_pcl_gt or args.vpcl:
+    #     xy1_pred = minibatch_l["cam_info_full"].xy1_grid
+    #     pcd_gt = pcl_from_grid_xy1_dep(xy1_pred, minibatch_l['depth_full'], minibatch_l['image_full'])
+    #     if args.save_pcl_gt:
+    #         pcl_write(pcd_gt[0], "{}/{}_gt".format(args.vpath, idx))
+    #     if args.vpcl:
+    #         pcl_vis_seq(pcd_gt, viewer=pcl_viewer, snapshot_fname_fmt="{}/{}_pcdvis_gt".format(args.vpath, idx)+"_{}")
 
     ##########################################################################
 

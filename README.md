@@ -1,29 +1,68 @@
-# SupervisedDepthPrediction
-This is a distributed training framework for supervised depth prediction based on Pytorch 1.0 (Pytorch version >= 1.2 is best). Now it provide the implementation of DORN(state of the art in KITTI depth prediction benchmark), and you can implement your model in your customed dataset with a little modification.
+# Monocular Depth Prediction through Continuous 3D Loss (DORN version)
+This is the implementation of the paper [Monocular Depth Prediction Through Continuous 3D Loss](https://arxiv.org/abs/2003.09763) based on DORN network. The DORN implementation is based on this [repo](https://github.com/dontLoveBugs/SupervisedDepthPrediction), which is an unofficial Pytorch implementation. 
 
-# Highlights
-- **Distributed & Single GPU** Flexible selection between distributed training with multi gpus and a single gpu.
-- **Flexible Visulization Implementation** You can implement your visulizers for network comprehensive analysis. 
-- **Suport Various Optimizers and Learning-rate Policy** Provide all the optimizers and learning-rate schedulers in pytorch. And support poly lr_scheduler and warmup, which are widely used in segmentation and detection.
-- **Support Grad Clip** Provide grad clip to avoid gradient exploding.
-- **Mixed Precision Training** Support mixed precision training with NVIDIA apex lib.
-- **Sync BN** Support Sync BN when training with multi gps.
-- **Break-point Restoration** Support continue to train from a break-point.
+# Get started
+The code is tested under under python 3.6, PyTorch 1.2.0, CUDA 10.1 on Ubuntu 18.04. 
 
+## 1. Install C3D library
+Please see [C3D](https://github.com/minghanz/c3d) for instructions. 
 
+## 2. Data preparation (KITTI)
+### a. KITTI raw dataset preparation (for training, borrowed from [Monodepth2](https://github.com/nianticlabs/monodepth2))
+You can download the entire [raw KITTI dataset](http://www.cvlibs.net/datasets/kitti/raw_data.php) by running:
+```shell
+wget -i datasets/lists/kitti_archives_to_download.txt -P <kitti_data>
+```
+Then unzip with
+```shell
+$ cd <kitti_data>
+$ unzip "*.zip"
+$ cd ..
+```
+The target folder `<kitti_data>` can be set to any path you prefer. **Warning:** the data weighs about **175GB**, so make sure to choose a path you have enough space to unzip too!
 
+### b. KITTI depth dataset preparation (for evaluation)
+Download the KITI depth dataset from this link [KITTI](http://www.cvlibs.net/download.php?file=data_depth_annotated.zip).\
+Then,
+```shell
+$ cd scripts
+$ python unzip_kitti_depth_to_raw.py -s <path_to_data_depth_annotated.zip> -t <kitti_data>
+```
 
+### c. Interpolating KITTI raw LIDAR depth to dense depth images
+Interpolation of the raw LIDAR depth is down using the tool in NYU-depth. The process is time-consuming for the whole KITTI dataset. Therefore we provided a link to download the interpolated files: [link](https://drive.google.com/drive/folders/11yv9FM5UV54yQrnj0DTd4Gn7abKa0f5J?usp=sharing). 
 
-# Installation
-conda install -c conda-forge future ruamel.yaml nvidia-apex
+With the zip files downloaded, we can now extract them to merge with the raw KITTI folder: 
+```shell
+$ cd scripts
+$ ./unzip_filled_depth.sh
+```
+Remember to edit the path to the downloaded zip files and target folder in `scripts/unzip_filled_depth.sh`.
 
-# Dataset
+## 3. Training
+```shell
+$ ./train.sh <num_of_gpu_to_use> -c <path_to_config_file>
+```
+For example: 
+- Training using original DORN setup with **KITTI (densified) depth** as ground truth: 
+```shell
+$ ./train.sh <num_of_gpu_to_use> -c config/dorn_kitti.yaml
+```
+- Training using original DORN setup with interpolated **KITTI raw LIDAR depth** as ground truth: 
+```shell
+$ ./train.sh <num_of_gpu_to_use> -c config/dorn_kitti_filled.yaml
+```
+- Training using sparse **KITTI raw LIDAR depth** with our proposed **Continuous 3D (C3D) Loss**: 
+```shell
+$ ./train.sh <num_of_gpu_to_use> -c config/dorn_kitti_sparse.yaml
+```
+In all these examples, remember to change the `path` in config file to the `<kitti_data>` path you choose. 
 
+## 4. Evaluation
+```shell
+$ cd scripts
+$ python eval.py -c config/dorn_eval_kitti.yaml -r <path_to_checkpoint>
+```
+This script provides quantitative results on KITTI eigen test set using improved depth images. Optionally you can generate qualitative outputs (depth predictions, normal images, etc. ) using this script.  
 
-# Training
-
-
-# Testing
-
-
-# Results
+Remember to change the path in `config/dorn_eval_kitti.yaml` to the `<kitti_data>` path you choose. A pretrained model can be downloaded at: [link](https://drive.google.com/drive/folders/1w2B9QvS9-1DZuLJ4K_tv8-qAtgpLR7Ea?usp=sharing). 

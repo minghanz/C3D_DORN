@@ -20,7 +20,7 @@ from dp.datasets.base_dataset import BaseDataset
 from dp.datasets.utils import nomalize, PILLoader, KittiDepthLoader
 
 import sys
-sys.path.append("../../../")
+# sys.path.append("../../../")
 from c3d.utils_general.dataset_read import DataReaderKITTI, DataReaderVKITTI2
 from c3d.utils.cam_proj import CamProj, seq_ops_on_cam_info
 from c3d.utils.cam import CamCrop

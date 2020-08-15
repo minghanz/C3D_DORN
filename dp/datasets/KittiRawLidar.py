@@ -24,7 +24,7 @@ from dp.datasets.utils import nomalize, PILLoader, KittiDepthLoader
 from dp.datasets.Kitti import Kitti
 
 import sys
-sys.path.append("../../../")
+# sys.path.append("../../../")
 from c3d.utils_general.dataset_read import DataReaderKITTI
 from c3d.utils_general.calib import lidar_to_depth
 from c3d.utils.cam_proj import CamProj, seq_ops_on_cam_info

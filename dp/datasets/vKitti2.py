@@ -17,7 +17,7 @@ import numpy as np
 from dp.datasets.Kitti import Kitti
 
 import sys
-sys.path.append("../../../")
+# sys.path.append("../../../")
 from c3d.utils_general.dataset_read import DataReaderVKITTI2
 from c3d.utils.cam_proj import CamProj
 

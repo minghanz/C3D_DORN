@@ -18,7 +18,7 @@ from dp.modules.decoders.OrdinalRegression import OrdinalRegressionLayer
 from dp.modules.losses.ordinal_regression_loss import OrdinalRegressionLoss
 
 import sys
-sys.path.append("../../../")
+# sys.path.append("../../../")
 from c3d.c3d_loss import C3DLoss
 from c3d.utils_general.vis import overlay_dep_on_rgb
 import time

@@ -24,7 +24,7 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
 
 # sys.path.append(os.path.abspath(".."))
 sys.path.insert(0, os.path.abspath(".."))  
-sys.path.insert(0, os.path.abspath("../../"))   # for c3d
+# sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
 from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np
 from c3d.utils.geometry import NormalFromDepthDense

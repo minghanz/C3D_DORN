@@ -17,5 +17,5 @@
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate tp36dup
 # CUDA_VISIBLE_DEVICES=0 
-./train.sh 2 -c config/dorn_kitti_sparse.yaml
+./train.sh 2 -c config/dorn_kitti_sparse.yaml -p config/dorn_path_kitti_mct.yaml
 # python bts_test_dataloader.py arguments_train_eigen_c3d.txt

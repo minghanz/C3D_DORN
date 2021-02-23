@@ -18,10 +18,9 @@ model:
     discretization: "SID"
     pretrained: True
 data:
-  name: "Kitti"
+  name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]
   split: ["trainfilled", "trainval"]
-  path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]
@@ -50,8 +49,5 @@ apex:
   loss_scale:
 vis_config:
   name: "dorn"
-snap:
-  # path: "/data/snap_dir/monodepth"
-  path: "./snap_dir/monodepth"
 
 

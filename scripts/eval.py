@@ -34,7 +34,7 @@ from c3d.utils.geometry import NormalFromDepthDense
 os.chdir("..")
 
 from dp.metircs.average_meter import AverageMeter
-from dp.utils.config import load_config, print_config
+from dp.utils.config import load_config, print_config, merge_config
 from dp.utils.pyt_io import create_summary_writer
 from dp.metircs import build_metrics
 from dp.core.solver import Solver
@@ -45,6 +45,7 @@ from dp.utils.compose_for_eval import compose_preds, kb_crop_preds ### Minghan: 
 
 parser = argparse.ArgumentParser(description='Training script')
 parser.add_argument('-c', '--config', type=str)
+parser.add_argument('-p', '--pathcfg', type=str)    # separate the path-related config items in another file
 parser.add_argument('-r', '--resumed', type=str, default=None, required=False)
 parser.add_argument("--local_rank", default=0, type=int)
 ### options for outputing visualization
@@ -86,6 +87,9 @@ if args.resumed:
             raise FileNotFoundError
 else:
     config = load_config(args.config)
+    pathcfg = load_config(args.pathcfg)
+    config = merge_config(config, pathcfg)
+
     solver.init_from_scratch(config)
     if is_main_process:
         exp_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime())

@@ -1,0 +1,7 @@
+data:
+  path: '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data'
+snap:
+  # path: "/data/snap_dir/monodepth"
+  path: "./snap_dir/monodepth"
+
+

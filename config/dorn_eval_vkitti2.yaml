@@ -1,7 +1,6 @@
 data:
   name: [None, "vKitti2"]
   split: [None, "eval_visualize"]     # for qualitative/quantitative output
-  path: '/mnt/storage8t/minghanz/Datasets/vKITTI2'
   tr_crop_size: [352, 704]
   te_crop_size: [352, 704]
   norm_type: "imagenet-norm"

@@ -51,7 +51,7 @@ class DepthPredModel(nn.Module):
             self.criterion = OrdinalRegressionLoss(ord_num, beta, discretization)
         else:
             self.criterion = OrdinalRegressionLoss(ord_num, beta, discretization)
-            self.criterion2 = C3DLoss()
+            self.criterion2 = C3DLoss(seq_frame_n=1)
             self.criterion2.parse_opts(f_input=path_of_c3d_cfg)
             self.criterion2.cuda() ### ? not sure whether this is needed
 

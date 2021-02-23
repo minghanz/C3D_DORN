@@ -1,0 +1,7 @@
+data:
+  path: '/media/sda1/minghanz/datasets/kitti/kitti_data'
+snap:
+  # path: "/data/snap_dir/monodepth"
+  path: "./snap_dir/monodepth"
+
+

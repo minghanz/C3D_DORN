@@ -49,11 +49,14 @@ class KittiRawLidar(Kitti):
         ntp = self.datareader.ffinder.ntp_from_fname(file, 'lidar')
         data_dict = self.datareader.read_datadict_from_ntp(ntp, wanted_ftype_list)
         velo = data_dict['lidar']
-        K_unit = data_dict['calib'].K_unit
-        extr_cam_li = data_dict['calib'].P_cam_li
-        im_shape = (data_dict['calib'].height, data_dict['calib'].width)
-        depth_gt = lidar_to_depth(velo, extr_cam_li, K_unit, im_shape, torch_mode=False)
+        # K_unit = data_dict['calib'].K_unit
+        # extr_cam_li = data_dict['calib'].P_cam_li
+        # im_shape = (data_dict['calib'].height, data_dict['calib'].width)
+        # depth_gt = lidar_to_depth(velo, extr_cam_li, K_unit, im_shape, torch_mode=False)
 
+        in_ex = data_dict['calib']
+        depth_gt = in_ex.lidar_to_depth(velo)
+        
         depth_gt[depth_gt == 0] = -1. ## this is to be consistent with KittiDepthLoader in utils.py
         return depth_gt
 

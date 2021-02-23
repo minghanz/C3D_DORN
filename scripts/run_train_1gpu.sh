@@ -1,0 +1,1 @@
+python train.py -c config/dorn_kitti.yaml -p config/dorn_path_kitti_mct.yaml

@@ -26,6 +26,7 @@ data:
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]
   te_crop_size: [352, 704]
+  te_crop_mode: "center"
   norm_type: "imagenet-norm"
 solver:
   epochs: 14

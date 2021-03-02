@@ -13,8 +13,13 @@ import torch.nn.functional as F
 
 
 class OrdinalRegressionLayer(nn.Module):
-    def __init__(self):
+    def __init__(self, acc_ordreg=False):
+        """
+        acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
+        """
         super(OrdinalRegressionLayer, self).__init__()
+
+        self.acc_ordreg = acc_ordreg
 
     def forward(self, x):
         """
@@ -22,6 +27,27 @@ class OrdinalRegressionLayer(nn.Module):
         :return: ord_label is ordinal outputs for each spatial locations , N x 1 x H x W
                  ord prob is the probability of each label, N x OrdNum x H x W
         """
+        if self.acc_ordreg:
+            return self.forward_acc_ordreg(x)
+        else:
+            return self.forward_original_DORN(x)
+
+    def forward_acc_ordreg(self, x):
+        N, C, H, W = x.size()
+        ord_num = C
+
+        ord_prob = F.softmax(x, dim=1)
+        ord_cdf = torch.cumsum(ord_prob.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
+        ord_label = torch.sum((ord_cdf > 0.5), dim=1) - 1
+
+        ord_logp = torch.log(ord_cdf)
+        ord_logq = torch.log(torch.clamp(1-ord_cdf, min=1e-5))
+
+        ord_log = torch.cat([ord_logp, ord_logq], dim=1)
+
+        return ord_log, ord_cdf, ord_label
+
+    def forward_original_DORN(self, x):
         N, C, H, W = x.size()
         ord_num = C // 2
 

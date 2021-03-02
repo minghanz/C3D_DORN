@@ -1,0 +1,56 @@
+environ:
+  seed: 5
+  deterministic: False
+model:
+  name: "dorn"
+  pretrained_model:
+  params:
+    # ord_num: 90
+    ord_num: 80
+    gamma: -0.97
+    beta: 90.0
+    # input_size: [385, 513]
+    input_size: [352, 704]
+    kernel_size: 16
+    # pyramid: [8, 12, 16]
+    pyramid: [6, 12, 18]
+    batch_norm: False
+    discretization: "SID"
+    pretrained: True
+    acc_ordreg: True
+data:
+  name: ["Kitti", "Kitti"]
+  # split: ["trainval", "selected_val"]
+  split: ["train", "trainval"]
+  # split: ["trainsparse", "trainval"]
+  # tr_crop_size: [385, 513]
+  # te_crop_size: [385, 513]
+  tr_crop_size: [352, 704]
+  te_crop_size: [352, 704]
+  te_crop_mode: "center"
+  norm_type: "imagenet-norm"
+solver:
+  epochs: 14
+  # batch_size: 4
+  batch_size: 2
+  step_decay: 1
+  optimizer:
+    name: 'SGD'
+    params:
+      lr: 0.0001
+      momentum: 0.9
+      weight_decay: 0.0005
+  lr_policy:
+    name: 'poly'
+    params:
+      gamma: 0.9
+      n_iteration: 300636
+apex:
+  amp_used: False
+  opt_level: "O1"
+  keep_batchnorm_fp32:
+  loss_scale:
+vis_config:
+  name: "dorn"
+
+

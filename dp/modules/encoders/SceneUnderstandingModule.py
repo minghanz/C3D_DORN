@@ -43,7 +43,11 @@ class FullImageEncoder(nn.Module):
 
 
 class SceneUnderstandingModule(nn.Module):
-    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False):
+    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False):
+        """
+        acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
+        """
+
         # pyramid kitti [6, 12, 18] nyu [4, 8, 12]
         super(SceneUnderstandingModule, self).__init__()
         assert len(size) == 2
@@ -67,12 +71,22 @@ class SceneUnderstandingModule(nn.Module):
             conv_bn_relu(batch_norm, 2048, 512, kernel_size=3, padding=pyramid[2], dilation=pyramid[2]),
             conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0)
         )
-        self.concat_process = nn.Sequential(
-            nn.Dropout2d(p=dropout_prob),
-            conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
-            nn.Dropout2d(p=dropout_prob),
-            nn.Conv2d(2048, int(ord_num * 2), 1)
-        )
+
+        self.acc_ordreg = acc_ordreg
+        if self.acc_ordreg:
+            self.concat_process = nn.Sequential(
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                nn.Dropout2d(p=dropout_prob),
+                nn.Conv2d(2048, ord_num, 1)
+            )
+        else:
+            self.concat_process = nn.Sequential(
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                nn.Dropout2d(p=dropout_prob),
+                nn.Conv2d(2048, int(ord_num * 2), 1)
+            )
 
     def forward(self, x):
         N, C, H, W = x.shape

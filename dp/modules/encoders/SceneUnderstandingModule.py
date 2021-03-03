@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dp.modules.layers.basic_layers import conv_bn_relu
-
+import math
 
 class FullImageEncoder(nn.Module):
     def __init__(self, h, w, kernel_size, dropout_prob=0.5):
@@ -43,7 +43,7 @@ class FullImageEncoder(nn.Module):
 
 
 class SceneUnderstandingModule(nn.Module):
-    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False):
+    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
@@ -55,10 +55,22 @@ class SceneUnderstandingModule(nn.Module):
         self.size = size
         h, w = self.size
         self.encoder = FullImageEncoder(h // 8, w // 8, kernel_size, dropout_prob)
-        self.aspp1 = nn.Sequential(
-            conv_bn_relu(batch_norm, 2048, 512, kernel_size=1, padding=0),
-            conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0)
-        )
+
+        self.dyn_weight = dyn_weight
+        self.acc_ordreg = acc_ordreg
+
+        if self.dyn_weight:
+            self.aspp1 = nn.Sequential(
+                conv_bn_relu(batch_norm, 2048, 512, kernel_size=1, padding=0),
+                conv_bn_relu(batch_norm, 512, 128, kernel_size=1, padding=0), 
+                nn.Conv2d(128, 32, 1)
+            )
+        else:
+            self.aspp1 = nn.Sequential(
+                conv_bn_relu(batch_norm, 2048, 512, kernel_size=1, padding=0),
+                conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0)
+            )
+
         self.aspp2 = nn.Sequential(
             conv_bn_relu(batch_norm, 2048, 512, kernel_size=3, padding=pyramid[0], dilation=pyramid[0]),
             conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0)
@@ -72,21 +84,27 @@ class SceneUnderstandingModule(nn.Module):
             conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0)
         )
 
-        self.acc_ordreg = acc_ordreg
-        if self.acc_ordreg:
+        if self.dyn_weight:
             self.concat_process = nn.Sequential(
                 nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
-                nn.Dropout2d(p=dropout_prob),
-                nn.Conv2d(2048, ord_num, 1)
+                conv_bn_relu(batch_norm, 512 * 4, ord_num * 32, kernel_size=1, padding=0), 
+                nn.Conv2d(ord_num * 32, ord_num * 32, 1, groups=ord_num)
             )
         else:
-            self.concat_process = nn.Sequential(
-                nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
-                nn.Dropout2d(p=dropout_prob),
-                nn.Conv2d(2048, int(ord_num * 2), 1)
-            )
+            if self.acc_ordreg:
+                self.concat_process = nn.Sequential(
+                    nn.Dropout2d(p=dropout_prob),
+                    conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    nn.Dropout2d(p=dropout_prob),
+                    nn.Conv2d(2048, ord_num, 1)
+                )
+            else:
+                self.concat_process = nn.Sequential(
+                    nn.Dropout2d(p=dropout_prob),
+                    conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    nn.Dropout2d(p=dropout_prob),
+                    nn.Conv2d(2048, int(ord_num * 2), 1)
+                )
 
     def forward(self, x):
         N, C, H, W = x.shape
@@ -98,7 +116,24 @@ class SceneUnderstandingModule(nn.Module):
         x4 = self.aspp3(x)
         x5 = self.aspp4(x)
 
-        x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
-        out = self.concat_process(x6)
-        out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
+        if self.dyn_weight:
+            x6 = torch.cat((x1, x3, x4, x5), dim=1)
+            dyn_weight = self.concat_process(x6)
+            out = self.dyn_weight_attention(x2, dyn_weight)
+            out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
+        else:
+            x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
+            out = self.concat_process(x6)
+            out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
         return out
+
+    def dyn_weight_attention(self, x, dyn_weight):
+        N, C, H, W = x.size()
+
+        dyn_weight = dyn_weight.reshape(N, C, -1, H, W)
+        x = x.unsqueeze(2)
+
+        attention_out = (x * dyn_weight).sum(dim=1) # N*ord_num*H*W
+        attention_out = attention_out / math.sqrt(6) #5.66   # 6 ~ sqrt(32)
+
+        return attention_out

@@ -30,7 +30,7 @@ class DepthPredModel(nn.Module):
                  input_size=(385, 513), kernel_size=16, pyramid=[8, 12, 16],
                  batch_norm=False,
                  discretization="SID", pretrained=True, path_of_c3d_cfg=None, 
-                 acc_ordreg=False):
+                 acc_ordreg=False, dyn_weight=False):
         super().__init__()
         assert len(input_size) == 2
         assert isinstance(kernel_size, int)
@@ -44,7 +44,8 @@ class DepthPredModel(nn.Module):
                                                                  kernel_size=kernel_size,
                                                                  pyramid=pyramid,
                                                                  batch_norm=batch_norm, 
-                                                                 acc_ordreg=acc_ordreg)
+                                                                 acc_ordreg=acc_ordreg, 
+                                                                 dyn_weight=dyn_weight)
         self.regression_layer = OrdinalRegressionLayer(acc_ordreg=acc_ordreg)
 
         self.flag_use_c3d =path_of_c3d_cfg is not None

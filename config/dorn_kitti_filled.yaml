@@ -25,12 +25,16 @@ data:
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]
   te_crop_size: [352, 704]
+  # te_crop_size: [352, 1216]
+  # te_crop_mode: "kb_crop"
   te_crop_mode: "center"
   norm_type: "imagenet-norm"
 solver:
   epochs: 14
+  # epochs: 40  # in cluster 40 epochs were run for final results
   # batch_size: 4
   batch_size: 2
+  # batch_size: 3 # in cluster batch size 3 is used.
   step_decay: 1
   optimizer:
     name: 'SGD'

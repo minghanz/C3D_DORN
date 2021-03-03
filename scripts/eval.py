@@ -74,11 +74,22 @@ if args.resumed:
     continue_state_object = torch.load(args.resumed,
                                        map_location=torch.device("cpu"))
     config = continue_state_object['config']
-    ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
     if args.config:
         override_cfg = load_config(args.config)
         config.update(override_cfg)
 
+    # ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
+    # config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/KITTI_data/kitti_data' 
+    # config["data"]["path"] = '/mnt/storage8t/minghanz/Datasets/vKITTI2'  ### for vkitti2 dataset
+    ### Minghan: change to the data split you want to test on
+    # config["data"]["split"][1] = "eval_visualize"
+    # config["data"]["split"][1] = "eval_visualize_vkitti2"
+    # ### Minghan: use vkitti2 as evaluation
+    # if not isinstance(config["data"]["name"], list):
+    #     config["data"]["name"] = [config["data"]["name"]]
+    #     config["data"]["name"].append("vKitti2")
+    # else:
+    #     config["data"]["name"][1] = "vKitti2"
     solver.init_from_checkpoint(continue_state_object=continue_state_object)
     if is_main_process:
         snap_dir = args.resumed[:-len(args.resumed.split('/')[-1])]

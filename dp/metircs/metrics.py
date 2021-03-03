@@ -169,14 +169,24 @@ class Metrics(object):
         if writer is None:
             return
         keys = ["stage_{}".format(i) for i in range(self.n_stage)]
-        writer.add_scalars(tag + "/mse", dict(zip(keys, self.mse.mean())), epoch)
-        writer.add_scalars(tag + "/rmse", dict(zip(keys, self.rmse.mean())), epoch)
-        writer.add_scalars(tag + "/mae", dict(zip(keys, self.mae.mean())), epoch)
-        writer.add_scalars(tag + "/absrml", dict(zip(keys, self.absrel.mean())), epoch)
-        writer.add_scalars(tag + "/silog", dict(zip(keys, self.silog.mean())), epoch)
-        writer.add_scalars(tag + "/d1", dict(zip(keys, self.d1.mean())), epoch)
-        writer.add_scalars(tag + "/d2", dict(zip(keys, self.d2.mean())), epoch)
-        writer.add_scalars(tag + "/d3", dict(zip(keys, self.d3.mean())), epoch)
+        # writer.add_scalars(tag + "/mse", dict(zip(keys, self.mse.mean())), epoch)
+        # writer.add_scalars(tag + "/rmse", dict(zip(keys, self.rmse.mean())), epoch)
+        # writer.add_scalars(tag + "/mae", dict(zip(keys, self.mae.mean())), epoch)
+        # writer.add_scalars(tag + "/absrml", dict(zip(keys, self.absrel.mean())), epoch)
+        # writer.add_scalars(tag + "/silog", dict(zip(keys, self.silog.mean())), epoch)
+        # writer.add_scalars(tag + "/d1", dict(zip(keys, self.d1.mean())), epoch)
+        # writer.add_scalars(tag + "/d2", dict(zip(keys, self.d2.mean())), epoch)
+        # writer.add_scalars(tag + "/d3", dict(zip(keys, self.d3.mean())), epoch)
+
+        ### Minghan: avoid creating too many items in tensorboard
+        writer.add_scalar(tag + "/mse", self.mse.mean()[-1], epoch)
+        writer.add_scalar(tag + "/rmse", self.rmse.mean()[-1], epoch)
+        writer.add_scalar(tag + "/mae", self.mae.mean()[-1], epoch)
+        writer.add_scalar(tag + "/absrml", self.absrel.mean()[-1], epoch)
+        writer.add_scalar(tag + "/silog", self.silog.mean()[-1], epoch)
+        writer.add_scalar(tag + "/d1", self.d1.mean()[-1], epoch)
+        writer.add_scalar(tag + "/d2", self.d2.mean()[-1], epoch)
+        writer.add_scalar(tag + "/d3", self.d3.mean()[-1], epoch)
 
     def get_snapshot_info(self):
         info = "absrel: %.2f" % self.absrel.values()[-1] + "(%.2f)" % self.absrel.mean()[-1]

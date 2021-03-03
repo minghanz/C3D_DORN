@@ -30,8 +30,10 @@ data:
   norm_type: "imagenet-norm"
 solver:
   epochs: 14
+  # epochs: 40  # in cluster 40 epochs were run for final results
   # batch_size: 4
   batch_size: 2
+  # batch_size: 3 # in cluster batch size 3 is used.
   step_decay: 1
   optimizer:
     name: 'SGD'
@@ -39,6 +41,10 @@ solver:
       lr: 0.0001
       momentum: 0.9
       weight_decay: 0.0005
+    # name: 'Adam'    # in cluster, Adam optimizer is tried but did not show better result. 
+    # params:
+    #   lr: 0.0001
+    #   weight_decay: 0.0005
   lr_policy:
     name: 'poly'
     params:
@@ -51,5 +57,4 @@ apex:
   loss_scale:
 vis_config:
   name: "dorn"
-
 

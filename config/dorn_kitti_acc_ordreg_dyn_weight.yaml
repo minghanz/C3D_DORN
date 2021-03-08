@@ -19,6 +19,7 @@ model:
     pretrained: True
     acc_ordreg: True
     dyn_weight: True
+    use_prob_loss: True
 data:
   name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]

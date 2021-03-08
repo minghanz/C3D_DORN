@@ -37,6 +37,10 @@ class OrdinalRegressionLoss(object):
         mask = (mask > label)
         ord_c0[mask] = 0
         ord_c1 = 1 - ord_c0
+
+        ### ord_c0: 1 if d_gt (i.e. label) >= d_level (i.e. mask)
+        ### ord_c1: 1 if d_gt (i.e. label) <  d_level (i.e. mask)
+
         # implementation according to the paper.
         # ord_label = torch.ones(N, self.ord_num * 2, H, W).to(gt.device)
         # ord_label[:, 0::2, :, :] = ord_c0

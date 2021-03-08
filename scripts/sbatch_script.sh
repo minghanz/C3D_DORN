@@ -17,7 +17,8 @@
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate tp36dup
 # CUDA_VISIBLE_DEVICES=0 
-./train.sh 2 -c config/dorn_kitti_sparse.yaml -p config/dorn_path_kitti_mct.yaml
+# ./train.sh 1 -c config/dorn_kitti_acc_ordreg_dyn_weight.yaml -p config/dorn_path_kitti_cluster.yaml
+./train.sh 1 -c config/dorn_kitti_acc_ordreg.yaml -p config/dorn_path_kitti_cluster.yaml
 # python bts_test_dataloader.py arguments_train_eigen_c3d.txt
 # python -m torch.distributed.launch --nproc_per_node=2 train.py -c config/dorn_kitti_sparse.yaml -r /scratch/hpeng_root/hpeng1/minghanz/tmp/DORN_pytorch/snap_dir/monodepth/KittiRawLidar/dorn/2020_07_23_11_44_56/epoch-10.pth
 # python train.py -c config/dorn_kitti_filled.yaml -r /scratch/hpeng_root/hpeng1/minghanz/tmp/DORN_pytorch/snap_dir/monodepth/Kitti/dorn/2020_07_23_11_44_09/epoch-10.pth
@@ -35,4 +36,4 @@ conda activate tp36dup
 # python eval.py -c config/dorn_kitti.yaml -r /scratch/hpeng_root/hpeng1/minghanz/tmp/DORN_pytorch/snap_dir/monodepth/Kitti/dorn/2020_07_26_11_51_42/epoch-40.pth
 # python eval.py -c config/dorn_kitti_sparse.yaml -r /scratch/hpeng_root/hpeng1/minghanz/tmp/DORN_pytorch/snap_dir/monodepth/KittiRawLidar/dorn/2020_07_23_11_44_56/epoch-20.pth
 
-python activate_all_files.py
+# python activate_all_files.py

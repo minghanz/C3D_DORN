@@ -60,10 +60,11 @@ class SceneUnderstandingModule(nn.Module):
         self.acc_ordreg = acc_ordreg
 
         if self.dyn_weight:
+            self.feat_dim = 32
             self.aspp1 = nn.Sequential(
                 conv_bn_relu(batch_norm, 2048, 512, kernel_size=1, padding=0),
-                conv_bn_relu(batch_norm, 512, 128, kernel_size=1, padding=0), 
-                nn.Conv2d(128, 32, 1)
+                conv_bn_relu(batch_norm, 512, self.feat_dim*4, kernel_size=1, padding=0), 
+                nn.Conv2d(self.feat_dim*4, self.feat_dim, 1)
             )
         else:
             self.aspp1 = nn.Sequential(
@@ -87,8 +88,8 @@ class SceneUnderstandingModule(nn.Module):
         if self.dyn_weight:
             self.concat_process = nn.Sequential(
                 nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512 * 4, ord_num * 32, kernel_size=1, padding=0), 
-                nn.Conv2d(ord_num * 32, ord_num * 32, 1, groups=ord_num)
+                conv_bn_relu(batch_norm, 512 * 4, ord_num * self.feat_dim, kernel_size=1, padding=0), 
+                nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
             )
         else:
             if self.acc_ordreg:
@@ -134,6 +135,6 @@ class SceneUnderstandingModule(nn.Module):
         x = x.unsqueeze(2)
 
         attention_out = (x * dyn_weight).sum(dim=1) # N*ord_num*H*W
-        attention_out = attention_out / math.sqrt(6) #5.66   # 6 ~ sqrt(32)
+        attention_out = attention_out / math.sqrt(C) #5.66   # 6 ~ sqrt(32)
 
         return attention_out

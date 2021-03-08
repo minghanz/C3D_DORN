@@ -166,7 +166,12 @@ if __name__ == "__main__":
             io_time = t_end - t_start
             t_start = time.time()
             # loss = solver.step(**filtered_kwargs)
-            loss, loss_dorn, loss_c3d = solver.step(**filtered_kwargs)
+            loss, loss_dict = solver.step(**filtered_kwargs)
+            loss_dorn = loss_dict["loss_dorn"]
+            loss_c3d = loss_dict["loss_c3d"]
+            loss_mean = loss_dict["loss_mean"]
+            loss_deviation = loss_dict["loss_deviation"]
+            loss_nll = loss_dict["loss_nll"]
             t_end = time.time()
             inf_time = t_end - t_start
             loss_meter.update(loss)
@@ -177,8 +182,11 @@ if __name__ == "__main__":
                             + ' lr=%.8f' % solver.get_learning_rates()[0] \
                             + ' loss=%.2f' % loss.item() \
                             + '(%.2f)' % loss_meter.mean() \
-                            + ' loss_dorn=%.2f' % loss_dorn.item() \
-                            + ' loss_c3d=%.2f' % loss_c3d.item() \
+                            + ' l_dorn=%.2f' % loss_dorn.item() \
+                            + ' l_c3d=%.2f' % loss_c3d.item() \
+                            + ' l_mean=%.2f' % loss_mean.item() \
+                            + ' l_dev=%.2f' % loss_deviation.item() \
+                            + ' l_nll=%.2f' % loss_nll.item() \
                             + ' IO:%.2f' % io_time \
                             + ' Inf:%.2f' % inf_time
                 pbar.set_description(print_str, refresh=False)

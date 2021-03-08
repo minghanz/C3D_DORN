@@ -203,11 +203,14 @@ class Solver(object):
         """
         self.iteration += 1
         # loss = self.model(**kwargs)
-        loss, loss_dorn, loss_c3d = self.model(**kwargs)
-        loss_dorn /= self.step_decay
-        loss_c3d /= self.step_decay
+        loss, loss_dict = self.model(**kwargs)
+        # loss, loss_dorn, loss_c3d = self.model(**kwargs)
+        for key in loss_dict:
+            loss_dict[key] = loss_dict[key] / self.step_decay
+        # loss_dorn /= self.step_decay
+        # loss_c3d /= self.step_decay
 
-        loss /= self.step_decay
+        loss = loss / self.step_decay
 
         # backward
         if self.distributed and self.config['apex']['amp_used']:
@@ -225,14 +228,20 @@ class Solver(object):
 
         if self.distributed:
             reduced_loss = reduce_tensor(loss.data, self.world_size)
-            reduced_loss_dorn = reduce_tensor(loss_dorn.data, self.world_size)
-            reduced_loss_c3d = reduce_tensor(loss_c3d.data, self.world_size)
+            # reduced_loss_dorn = reduce_tensor(loss_dorn.data, self.world_size)
+            # reduced_loss_c3d = reduce_tensor(loss_c3d.data, self.world_size)
+            for key in loss_dict:
+                loss_dict[key] = reduce_tensor(loss_dict[key].data, self.world_size)
         else:
             reduced_loss = loss.data
-            reduced_loss_dorn = loss_dorn.data
-            reduced_loss_c3d = loss_c3d.data
+            # reduced_loss_dorn = loss_dorn.data
+            # reduced_loss_c3d = loss_c3d.data
+            for key in loss_dict:
+                loss_dict[key] = loss_dict[key].data
+
         # return reduced_loss
-        return reduced_loss, reduced_loss_dorn, reduced_loss_c3d
+        # return reduced_loss, reduced_loss_dorn, reduced_loss_c3d
+        return reduced_loss, loss_dict
 
     def step_no_grad(self, **kwargs):
         with torch.no_grad():

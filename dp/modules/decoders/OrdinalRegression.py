@@ -13,13 +13,14 @@ import torch.nn.functional as F
 
 
 class OrdinalRegressionLayer(nn.Module):
-    def __init__(self, acc_ordreg=False):
+    def __init__(self, acc_ordreg=False, weighted_combo=False):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
         super(OrdinalRegressionLayer, self).__init__()
 
         self.acc_ordreg = acc_ordreg
+        self.weighted_combo = weighted_combo
 
     def forward(self, x):
         """
@@ -45,7 +46,14 @@ class OrdinalRegressionLayer(nn.Module):
 
         ord_log = torch.cat([ord_logp, ord_logq], dim=1)
 
-        return ord_log, ord_cdf, ord_label
+        out = dict()
+        out["log_pq"] = ord_log
+        out["p"] = ord_cdf
+        out["label"] = ord_label
+        out["p_bin"] = ord_prob
+        return out
+
+        # return ord_log, ord_cdf, ord_label
 
     def forward_original_DORN(self, x):
         N, C, H, W = x.size()
@@ -88,4 +96,11 @@ class OrdinalRegressionLayer(nn.Module):
         prob = F.log_softmax(x, dim=1).view(N, C, H, W)
         ord_prob = F.softmax(x, dim=1)[:, 0, :, :, :]
         ord_label = torch.sum((ord_prob > 0.5), dim=1) - 1
-        return prob, ord_prob, ord_label
+
+        out = dict()
+        out["log_pq"] = prob
+        out["p"] = ord_prob
+        out["label"] = ord_label
+        return out
+
+        # return prob, ord_prob, ord_label

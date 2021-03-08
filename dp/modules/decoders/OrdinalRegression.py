@@ -40,7 +40,7 @@ class OrdinalRegressionLayer(nn.Module):
         ord_cdf = torch.cumsum(ord_prob.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
         ord_label = torch.sum((ord_cdf > 0.5), dim=1) - 1
 
-        ord_logp = torch.log(ord_cdf)
+        ord_logp = torch.log(torch.clamp(ord_cdf, min=1e-5))
         ord_logq = torch.log(torch.clamp(1-ord_cdf, min=1e-5))
 
         ord_log = torch.cat([ord_logp, ord_logq], dim=1)

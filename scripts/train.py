@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(".."))
 os.chdir("..")
 
 from dp.metircs.average_meter import AverageMeter
-from dp.utils.config import load_config, print_config, merge_config
+from dp.utils.config import load_config, print_config, merge_config, save_config
 from dp.utils.pyt_io import create_summary_writer
 from dp.metircs import build_metrics
 from dp.core.solver import Solver
@@ -120,6 +120,7 @@ if __name__ == "__main__":
 
     if is_main_process:
         print_config(config)
+        save_config(os.path.join(snap_dir, "config.yaml"), config)
 
     # dataset
     tr_loader, sampler, niter_per_epoch = build_loader(config, True, solver.world_size, solver.distributed)
@@ -142,6 +143,8 @@ if __name__ == "__main__":
     epoch_init = solver.epoch
     solver.after_epoch()
     validation(is_main_process, 5, bar_format, metric, te_loader, solver, epoch_init, config, visualizer)
+
+    # torch.autograd.set_detect_anomaly(True)
 
     for epoch in range(solver.epoch + 1, config['solver']['epochs'] + 1):
         solver.before_epoch(epoch=epoch)

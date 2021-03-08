@@ -51,9 +51,9 @@ class DepthPredModel(nn.Module):
         self.flag_use_c3d =path_of_c3d_cfg is not None
         if not self.flag_use_c3d:
             ###Minghan: original dorn loss
-            self.criterion = OrdinalRegressionLoss(ord_num, beta, discretization)
+            self.criterion = OrdinalRegressionLoss(ord_num, gamma, beta, discretization)
         else:
-            self.criterion = OrdinalRegressionLoss(ord_num, beta, discretization)
+            self.criterion = OrdinalRegressionLoss(ord_num, gamma, beta, discretization)
             self.criterion2 = C3DLoss(seq_frame_n=1)
             self.criterion2.parse_opts(f_input=path_of_c3d_cfg)
             self.criterion2.cuda() ### ? not sure whether this is needed

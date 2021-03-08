@@ -15,8 +15,9 @@ import torch.nn.functional as F
 
 class OrdinalRegressionLoss(object):
 
-    def __init__(self, ord_num, beta, discretization="SID"):
+    def __init__(self, ord_num, gamma, beta, discretization="SID"):
         self.ord_num = ord_num
+        self.gamma = gamma ### Minghan: this is missing before 20210307
         self.beta = beta
         self.discretization = discretization
 
@@ -26,9 +27,9 @@ class OrdinalRegressionLoss(object):
 
         ord_c0 = torch.ones(N, self.ord_num, H, W).to(gt.device)
         if self.discretization == "SID":
-            label = self.ord_num * torch.log(gt) / np.log(self.beta)
+            label = self.ord_num * torch.log((gt+self.gamma)) / np.log(self.beta)
         else:
-            label = self.ord_num * (gt - 1.0) / (self.beta - 1.0)
+            label = self.ord_num * ((gt+self.gamma) - 1.0) / (self.beta - 1.0)
         label = label.long()
         mask = torch.linspace(0, self.ord_num - 1, self.ord_num, requires_grad=False) \
             .view(1, self.ord_num, 1, 1).to(gt.device)

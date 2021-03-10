@@ -19,7 +19,9 @@ model:
     pretrained: True
     acc_ordreg: True
     dyn_weight: True
-    use_prob_loss: True
+    use_prob_loss: False
+    use_neighbor_depth: True
+    feat_dim: 48
 data:
   name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]

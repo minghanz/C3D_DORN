@@ -43,7 +43,7 @@ class FullImageEncoder(nn.Module):
 
 
 class SceneUnderstandingModule(nn.Module):
-    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False):
+    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False, feat_dim=32):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
@@ -60,7 +60,7 @@ class SceneUnderstandingModule(nn.Module):
         self.acc_ordreg = acc_ordreg
 
         if self.dyn_weight:
-            self.feat_dim = 32
+            self.feat_dim = feat_dim
             self.aspp1 = nn.Sequential(
                 conv_bn_relu(batch_norm, 2048, 512, kernel_size=1, padding=0),
                 conv_bn_relu(batch_norm, 512, self.feat_dim*4, kernel_size=1, padding=0), 

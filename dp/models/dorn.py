@@ -170,7 +170,9 @@ class DepthPredModel(nn.Module):
             depth = (t0 + t1) / 2 - self.gamma
         else:
             depth_pred = (out["p_bin"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
-            depth = depth_pred
+            if self.discretization == "SID":
+                depth_pred = torch.exp(depth_pred)
+            depth = depth_pred - self.gamma
         # print("depth min:", torch.min(depth), " max:", torch.max(depth),
         #       " label min:", torch.min(label), " max:", torch.max(label))
         return {"target": [depth], "prob": [prob], "label": [label]}

@@ -86,9 +86,17 @@ class SceneUnderstandingModule(nn.Module):
         )
 
         if self.dyn_weight:
+            # self.concat_process = nn.Sequential(
+            #     nn.Dropout2d(p=dropout_prob),
+            #     conv_bn_relu(batch_norm, 512 * 4, ord_num * self.feat_dim, kernel_size=1, padding=0), 
+            #     nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
+            # )
             self.concat_process = nn.Sequential(
                 nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512 * 4, ord_num * self.feat_dim, kernel_size=1, padding=0), 
+                conv_bn_relu(batch_norm, 512 * 4, 512, kernel_size=1, padding=0), 
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512, 512, kernel_size=3, padding=1),
+                conv_bn_relu(batch_norm, 512, ord_num * self.feat_dim, kernel_size=1, padding=0), 
                 nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
             )
         else:

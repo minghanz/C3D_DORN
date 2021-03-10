@@ -31,13 +31,13 @@ def consistent_padding_with_dilation(padding, dilation, dim=2):
     return padding, dilation
 
 
-def conv_bn_relu(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True):
+def conv_bn_relu(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True, groups=1):
     padding, dilation = consistent_padding_with_dilation(padding, dilation, dim=2)
     if batchNorm:
         return nn.Sequential(
             nn.Conv2d(
                 in_planes, out_planes, kernel_size=kernel_size, stride=stride,
-                padding=padding, dilation=dilation, bias=False),
+                padding=padding, dilation=dilation, bias=False, groups=groups),
             nn.BatchNorm2d(out_planes),
             nn.ReLU(inplace=True),
         )
@@ -45,6 +45,6 @@ def conv_bn_relu(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, padd
         return nn.Sequential(
             nn.Conv2d(
                 in_planes, out_planes, kernel_size=kernel_size, stride=stride,
-                padding=padding, dilation=dilation, bias=bias),
+                padding=padding, dilation=dilation, bias=bias, groups=groups),
             nn.ReLU(inplace=True),
         )

@@ -216,11 +216,11 @@ for idx in pbar:
 
     #################################################### visualization
     if args.vpbin:
-        p_bin = pred_l["p_cdf"][0]  # ord_num*H*W
-        p_bin_slide = p_bin[..., 100]   # ord_num*H
-        p_bin_slide = p_bin_slide.expand(3, -1, -1) # 3*ord_num*H
-        p_bin_np = uint8_np_from_img_tensor(p_bin_slide)
-        save_np_to_img(p_bin_np, "{}/{}_pbin_acc".format(args.vpath, idx))
+        p_cdf = pred_l["prob"][0]  # ord_num*H*W
+        p_cdf_slide = p_cdf[..., 100]   # ord_num*H
+        p_cdf_slide = p_cdf_slide.expand(3, -1, -1) # 3*ord_num*H
+        p_cdf_np = uint8_np_from_img_tensor(p_cdf_slide)
+        save_np_to_img(p_cdf_np, "{}/{}_pbin_acc".format(args.vpath, idx))
 
     if args.vmask:
         ### visualize mask showing pixels included in quantitative result

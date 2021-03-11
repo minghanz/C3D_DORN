@@ -50,6 +50,7 @@ parser.add_argument('-r', '--resumed', type=str, default=None, required=False)
 parser.add_argument("--local_rank", default=0, type=int)
 ### options for outputing visualization
 parser.add_argument("--vpath", type=str, default="vis")
+parser.add_argument("--vpbin", action="store_true", help="visualize probability for each bin")
 parser.add_argument("--vrgb", action="store_true", help="visualize rgb input images")
 parser.add_argument("--vdepth", action="store_true", help="visualize depth gt and predictions")
 parser.add_argument("--vmask", action="store_true", help="visualize which pixels are counted in quantitative results")
@@ -76,6 +77,8 @@ if args.resumed:
     config = continue_state_object['config']
     if args.config:
         override_cfg = load_config(args.config)
+        pathcfg = load_config(args.pathcfg)
+        override_cfg = merge_config(override_cfg, pathcfg)
         config.update(override_cfg)
 
     # ### Minghan: only use this line when the trained model and the evaluation is not on the same machine
@@ -212,6 +215,13 @@ for idx in pbar:
     mean_tracker.update(extra_dict['mean_pred']/extra_dict['mean_gt'])
 
     #################################################### visualization
+    if args.vpbin:
+        p_bin = pred_l["p_cdf"][0]  # ord_num*H*W
+        p_bin_slide = p_bin[..., 100]   # ord_num*H
+        p_bin_slide = p_bin_slide.expand(3, -1, -1) # 3*ord_num*H
+        p_bin_np = uint8_np_from_img_tensor(p_bin_slide)
+        save_np_to_img(p_bin_np, "{}/{}_pbin_acc".format(args.vpath, idx))
+
     if args.vmask:
         ### visualize mask showing pixels included in quantitative result
         mask = extra_dict['mask']

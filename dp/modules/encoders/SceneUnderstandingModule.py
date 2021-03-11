@@ -43,7 +43,7 @@ class FullImageEncoder(nn.Module):
 
 
 class SceneUnderstandingModule(nn.Module):
-    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False, feat_dim=32):
+    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False, feat_dim=32, double_ord=0):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
@@ -58,6 +58,7 @@ class SceneUnderstandingModule(nn.Module):
 
         self.dyn_weight = dyn_weight
         self.acc_ordreg = acc_ordreg
+        self.double_ord = double_ord    # number of classes in second_ord
 
         if self.dyn_weight:
             self.feat_dim = feat_dim
@@ -86,18 +87,32 @@ class SceneUnderstandingModule(nn.Module):
         )
 
         if self.dyn_weight:
-            # self.concat_process = nn.Sequential(
-            #     nn.Dropout2d(p=dropout_prob),
-            #     conv_bn_relu(batch_norm, 512 * 4, ord_num * self.feat_dim, kernel_size=1, padding=0), 
-            #     nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
-            # )
             self.concat_process = nn.Sequential(
                 nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512 * 4, 512, kernel_size=1, padding=0), 
-                nn.Dropout2d(p=dropout_prob),
-                conv_bn_relu(batch_norm, 512, 512, kernel_size=3, padding=1),
-                conv_bn_relu(batch_norm, 512, ord_num * self.feat_dim, kernel_size=1, padding=0), 
+                conv_bn_relu(batch_norm, 512 * 4, ord_num * self.feat_dim, kernel_size=1, padding=0), 
                 nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
+            )
+            # self.concat_process = nn.Sequential(
+            #     nn.Dropout2d(p=dropout_prob),
+            #     conv_bn_relu(batch_norm, 512 * 4, 512, kernel_size=1, padding=0), 
+            #     nn.Dropout2d(p=dropout_prob),
+            #     conv_bn_relu(batch_norm, 512, 512, kernel_size=3, padding=1),
+            #     conv_bn_relu(batch_norm, 512, ord_num * self.feat_dim, kernel_size=1, padding=0), 
+            #     nn.Conv2d(ord_num * self.feat_dim, ord_num * self.feat_dim, 1, groups=ord_num)
+            # )
+        elif self.double_ord > 0:
+            assert not self.dyn_weight
+            assert self.acc_ordreg
+            self.concat_process = nn.Sequential(
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                nn.Dropout2d(p=dropout_prob)
+            )
+            self.proj_head = nn.Conv2d(2048, ord_num, 1)
+            second_ord_num = double_ord
+            self.second_ord = nn.Sequential(
+                conv_bn_relu(batch_norm, 2048+ord_num, 512, kernel_size=1, padding=0),
+                nn.Conv2d(512, second_ord_num, 1)
             )
         else:
             if self.acc_ordreg:
@@ -130,6 +145,28 @@ class SceneUnderstandingModule(nn.Module):
             dyn_weight = self.concat_process(x6)
             out = self.dyn_weight_attention(x2, dyn_weight)
             out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
+        elif self.double_ord > 0:
+            x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
+            feat = self.concat_process(x6)
+            out_1 = self.proj_head(feat)
+            out_1_out = F.interpolate(out_1, size=self.size, mode="bilinear", align_corners=True)
+            out_1_softmax = F.softmax(out_1_out, dim=1)
+            ord_1_cdf = torch.cumsum(out_1_softmax.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
+            ord_1_cdf = F.normalize(ord_1_cdf, p=float("Inf"), dim=1)
+
+            ord_1_cdf_small = F.interpolate(ord_1_cdf, size=(out_1.shape[-2], out_1.shape[-1]), mode="bilinear", align_corners=True)
+            x_second = torch.cat([feat, ord_1_cdf_small], dim=1)
+            ord_2 = self.second_ord(x_second)
+            out_2_out = F.interpolate(out_2, size=self.size, mode="bilinear", align_corners=True)
+            out_2_softmax = F.softmax(out_2_out, dim=1)
+            ord_2_cdf = torch.cumsum(out_2_softmax.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
+            ord_2_cdf = F.normalize(ord_2_cdf, p=float("Inf"), dim=1)
+
+            out = dict()
+            out["p_1"] = out_1_softmax
+            out["cdf_1"] = ord_1_cdf
+            out["p_2"] = out_2_softmax
+            out["cdf_2"] = ord_2_cdf
         else:
             x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
             out = self.concat_process(x6)

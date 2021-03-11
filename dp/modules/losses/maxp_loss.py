@@ -24,7 +24,7 @@ class MaxPLoss(nn.Module):
         depth_vector = (depth_vector[:-1] + depth_vector[1:]) / 2
         self.register_buffer("depth_vector", depth_vector)
 
-    def __call__(self, p_bin, gt):
+    def forward(self, p_bin, gt):
         """
         p_bin: N*[ord_num]*H*W, each channel in [] represents the probability that the depth fall in that range (processed by softmax)
         """

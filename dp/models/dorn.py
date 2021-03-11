@@ -19,6 +19,7 @@ from dp.modules.losses.ordinal_regression_loss import OrdinalRegressionLoss
 
 from dp.modules.losses.maxp_loss import MaxPLoss
 from dp.modules.losses.neighbor_ctn_depth_loss import NeighborCtnDepthLoss
+from dp.modules.losses.second_ordinal_regression_loss import SecondOrdinalRegressionLoss
 
 import sys
 # sys.path.append("../../../")
@@ -33,7 +34,7 @@ class DepthPredModel(nn.Module):
                  input_size=(385, 513), kernel_size=16, pyramid=[8, 12, 16],
                  batch_norm=False,
                  discretization="SID", pretrained=True, path_of_c3d_cfg=None, 
-                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False):
+                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False, double_ord=0):
         super().__init__()
         assert len(input_size) == 2
         assert isinstance(kernel_size, int)
@@ -49,12 +50,15 @@ class DepthPredModel(nn.Module):
                                                                  batch_norm=batch_norm, 
                                                                  acc_ordreg=acc_ordreg, 
                                                                  dyn_weight=dyn_weight, 
-                                                                 feat_dim=feat_dim)
+                                                                 feat_dim=feat_dim, 
+                                                                 double_ord=double_ord)
         self.regression_layer = OrdinalRegressionLayer(acc_ordreg=acc_ordreg)
 
         self.flag_use_c3d = path_of_c3d_cfg is not None
         self.flag_use_prob_loss = use_prob_loss
         self.flag_use_neighbor_depth = use_neighbor_depth
+        self.flag_double_ord = double_ord > 0
+        self.double_ord = double_ord
             
         ###Minghan: original dorn loss
         self.criterion = OrdinalRegressionLoss(ord_num, gamma, beta, discretization)
@@ -72,6 +76,9 @@ class DepthPredModel(nn.Module):
             assert acc_ordreg
             self.criterion_nd = NeighborCtnDepthLoss(self.ord_num, self.gamma, self.beta, self.discretization)
             self.criterion_nd.cuda()
+
+        if self.flag_double_ord:
+            self.criterion_so = SecondOrdinalRegressionLoss(self.ord_num, self.gamma, self.beta, self.discretization, double_ord)
 
     def optimizer_params(self):
         group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), 
@@ -165,6 +172,11 @@ class DepthPredModel(nn.Module):
                 losses["loss_mean"] = losses_p["loss_mean"]
                 losses["loss_deviation"] = losses_p["loss_deviation"]
                 losses["loss_nll"] = losses_p["loss_nll"]
+            elif self.flag_double_ord:
+                loss_2nd_dorn = self.criterion_so(out["log_pq_2"], target, out["ord_idx_top"], out["ord_idx_bot"])
+                losses["loss_mean"] = loss_2nd_dorn
+                losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
+                losses["loss_nll"] = torch.zeros_like(losses["loss_dorn"])
             else:
                 losses["loss_mean"] = torch.zeros_like(losses["loss_dorn"])
                 losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
@@ -189,6 +201,14 @@ class DepthPredModel(nn.Module):
             if self.discretization == "SID":
                 depth_pred = torch.exp(depth_pred)
             depth = depth_pred - self.gamma
+        elif self.flag_double_ord:
+            log_top, log_bot = self.criterion_so.idx_to_value_topbot(out["ord_idx_top"], out["ord_idx_bot"])
+            t0 = log_top + (log_bot - log_top) * out["label_2"].float() / self.double_ord
+            t1 = log_top + (log_bot - log_top) * (out["label_2"].float()+1) / self.double_ord
+            depth = (t0 + t1) / 2
+            if self.discretization == "SID":
+                depth = torch.exp(depth)
+            depth = depth - self.gamma
         else:
             if self.discretization == "SID":
                 t0 = torch.exp(np.log(self.beta) * label.float() / self.ord_num)
@@ -199,4 +219,4 @@ class DepthPredModel(nn.Module):
             depth = (t0 + t1) / 2 - self.gamma
         # print("depth min:", torch.min(depth), " max:", torch.max(depth),
         #       " label min:", torch.min(label), " max:", torch.max(label))
-        return {"target": [depth], "prob": [prob], "label": [label]}
+        return {"target": [depth], "prob": [prob], "label": [label], "p_cdf": [out["p"]]}

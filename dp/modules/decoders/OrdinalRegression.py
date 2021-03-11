@@ -13,14 +13,14 @@ import torch.nn.functional as F
 
 
 class OrdinalRegressionLayer(nn.Module):
-    def __init__(self, acc_ordreg=False, weighted_combo=False):
+    def __init__(self, acc_ordreg=False, double_ord=False):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
         super(OrdinalRegressionLayer, self).__init__()
 
         self.acc_ordreg = acc_ordreg
-        self.weighted_combo = weighted_combo
+        self.double_ord = double_ord
 
     def forward(self, x):
         """
@@ -34,11 +34,30 @@ class OrdinalRegressionLayer(nn.Module):
             return self.forward_original_DORN(x)
 
     def forward_acc_ordreg(self, x):
-        N, C, H, W = x.size()
-        ord_num = C
+        if self.double_ord:
+            assert isinstance(x, dict)
+            ord_prob = x["p_1"]
+            ord_cdf = x["cdf_1"]
+            ord_prob_2 = x["p_2"] 
+            ord_cdf_2 = x["cdf_2"]
+            N, C, H, W = ord_prob.size()
+            ord_num = C
+            ord_idx_top = torch.sum((ord_cdf >= 0.7), dim=1, keepdim=True) - 1
+            ord_idx_bot = ord_num - torch.sum((ord_cdf <= 0.3), dim=1, keepdim=True)
+            ord_idx_top_clamp = ord_idx_top.clamp(min=0, max=ord_num-1)
+            ord_idx_bot_clamp = ord_idx_bot.clamp(min=0, max=ord_num-1)
+            cdf_max = torch.gather(ord_cdf, 1, ord_idx_top_clamp)
+            cdf_min = torch.gather(ord_cdf, 1, ord_idx_bot_clamp)
+            ord_cdf_2_scaled = cdf_min + (cdf_max-cdf_min) * ord_cdf_2
 
-        ord_prob = F.softmax(x, dim=1)
-        ord_cdf = torch.cumsum(ord_prob.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
+            ord_label_2 = torch.sum((ord_cdf_2_scaled > 0.5), dim=1) - 1
+        else:
+            N, C, H, W = x.size()
+            ord_num = C
+            ord_prob = F.softmax(x, dim=1)
+            ord_cdf = torch.cumsum(ord_prob.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
+            ord_cdf = F.normalize(ord_cdf, p=float("Inf"), dim=1)
+
         ord_label = torch.sum((ord_cdf > 0.5), dim=1) - 1
 
         ord_logp = torch.log(torch.clamp(ord_cdf, min=1e-5))
@@ -51,6 +70,17 @@ class OrdinalRegressionLayer(nn.Module):
         out["p"] = ord_cdf
         out["label"] = ord_label
         out["p_bin"] = ord_prob
+
+        if self.double_ord:
+            ord_logp_2 = torch.log(torch.clamp(ord_cdf_2_scaled, min=1e-5))
+            ord_logq_2 = torch.log(torch.clamp(1-ord_cdf_2_scaled, min=1e-5))
+            ord_log_2 = torch.cat([ord_logp_2, ord_logq_2], dim=1)
+            out["log_pq_2"] = ord_log_2
+            out["p_2"] = ord_cdf_2_scaled
+            out["ord_idx_top"] = ord_idx_top
+            out["ord_idx_bot"] = ord_idx_bot
+            out["label_2"] = ord_label_2
+
         return out
 
         # return ord_log, ord_cdf, ord_label

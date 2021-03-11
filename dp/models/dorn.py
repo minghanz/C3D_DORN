@@ -52,7 +52,7 @@ class DepthPredModel(nn.Module):
                                                                  dyn_weight=dyn_weight, 
                                                                  feat_dim=feat_dim, 
                                                                  double_ord=double_ord)
-        self.regression_layer = OrdinalRegressionLayer(acc_ordreg=acc_ordreg)
+        self.regression_layer = OrdinalRegressionLayer(acc_ordreg=acc_ordreg, double_ord=double_ord)
 
         self.flag_use_c3d = path_of_c3d_cfg is not None
         self.flag_use_prob_loss = use_prob_loss
@@ -203,6 +203,8 @@ class DepthPredModel(nn.Module):
             depth = depth_pred - self.gamma
         elif self.flag_double_ord:
             log_top, log_bot = self.criterion_so.idx_to_value_topbot(out["ord_idx_top"], out["ord_idx_bot"])
+            log_top = log_top.squeeze(1)
+            log_bot = log_bot.squeeze(1)
             t0 = log_top + (log_bot - log_top) * out["label_2"].float() / self.double_ord
             t1 = log_top + (log_bot - log_top) * (out["label_2"].float()+1) / self.double_ord
             depth = (t0 + t1) / 2
@@ -219,4 +221,4 @@ class DepthPredModel(nn.Module):
             depth = (t0 + t1) / 2 - self.gamma
         # print("depth min:", torch.min(depth), " max:", torch.max(depth),
         #       " label min:", torch.min(label), " max:", torch.max(label))
-        return {"target": [depth], "prob": [prob], "label": [label], "p_cdf": [out["p"]]}
+        return {"target": [depth], "prob": [prob], "label": [label]}

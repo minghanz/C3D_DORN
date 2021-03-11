@@ -156,7 +156,7 @@ class SceneUnderstandingModule(nn.Module):
 
             ord_1_cdf_small = F.interpolate(ord_1_cdf, size=(out_1.shape[-2], out_1.shape[-1]), mode="bilinear", align_corners=True)
             x_second = torch.cat([feat, ord_1_cdf_small], dim=1)
-            ord_2 = self.second_ord(x_second)
+            out_2 = self.second_ord(x_second)
             out_2_out = F.interpolate(out_2, size=self.size, mode="bilinear", align_corners=True)
             out_2_softmax = F.softmax(out_2_out, dim=1)
             ord_2_cdf = torch.cumsum(out_2_softmax.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction

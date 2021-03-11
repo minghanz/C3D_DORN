@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 
 class OrdinalRegressionLayer(nn.Module):
-    def __init__(self, acc_ordreg=False, double_ord=False):
+    def __init__(self, acc_ordreg=False, double_ord=0):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
@@ -34,7 +34,7 @@ class OrdinalRegressionLayer(nn.Module):
             return self.forward_original_DORN(x)
 
     def forward_acc_ordreg(self, x):
-        if self.double_ord:
+        if self.double_ord > 0:
             assert isinstance(x, dict)
             ord_prob = x["p_1"]
             ord_cdf = x["cdf_1"]
@@ -71,7 +71,7 @@ class OrdinalRegressionLayer(nn.Module):
         out["label"] = ord_label
         out["p_bin"] = ord_prob
 
-        if self.double_ord:
+        if self.double_ord > 0:
             ord_logp_2 = torch.log(torch.clamp(ord_cdf_2_scaled, min=1e-5))
             ord_logq_2 = torch.log(torch.clamp(1-ord_cdf_2_scaled, min=1e-5))
             ord_log_2 = torch.cat([ord_logp_2, ord_logq_2], dim=1)

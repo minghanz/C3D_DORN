@@ -9,7 +9,7 @@
 
 import numpy as np
 import torch
-
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -57,7 +57,7 @@ class SecondOrdinalRegressionLoss(nn.Module):
         ord_c0 = log_gt >= log_mask_local[:, :-1]
         ord_c1 = log_gt < log_mask_local[:, :-1]
 
-        ord_label = torch.cat((ord_c0, ord_c1), dim=1)
+        ord_label = torch.cat((ord_c0, ord_c1), dim=1).float()
 
         return ord_label
 

@@ -18,7 +18,10 @@ model:
     discretization: "SID"
     pretrained: True
     acc_ordreg: True
-    use_prob_loss: True
+    dyn_weight: False
+    use_prob_loss: False
+    use_neighbor_depth: False
+    double_ord: 40
 data:
   name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]

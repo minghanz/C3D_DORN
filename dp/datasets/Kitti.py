@@ -120,7 +120,13 @@ class Kitti(BaseDataset):
         image = nomalize(image, type=self.config['norm_type'])
         image = image.transpose(2, 0, 1)
 
-        return image, depth, None
+        ### also provide mask
+        mask_gt = depth > 0
+        mask_gt = np.expand_dims(mask_gt, axis=0)
+
+        extra_dict = {"mask_gt": mask_gt}
+
+        return image, depth, extra_dict
 
     def _te_preprocess(self, image, depth, image_path):
         ### Minghan: load cam_info, which should be adjusted with preprocessing logged in cam_ops

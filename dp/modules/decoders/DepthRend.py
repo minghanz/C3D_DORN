@@ -25,6 +25,7 @@ class DepthRend(nn.Module):
         """
 
         if self.training:
+            assert mask is not None
             pmul = x_dict["full"]["pmul"]
             feature = x_dict["net"]["feat"]
             ### directly interpolate the low-res depth to high-res

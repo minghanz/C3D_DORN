@@ -21,6 +21,8 @@ from dp.modules.losses.maxp_loss import MaxPLoss
 from dp.modules.losses.neighbor_ctn_depth_loss import NeighborCtnDepthLoss
 from dp.modules.losses.second_ordinal_regression_loss import SecondOrdinalRegressionLoss
 
+from dp.modules.decoders.DepthRend import DepthRend
+
 import sys
 # sys.path.append("../../../")
 from c3d.c3d_loss import C3DLoss
@@ -34,7 +36,7 @@ class DepthPredModel(nn.Module):
                  input_size=(385, 513), kernel_size=16, pyramid=[8, 12, 16],
                  batch_norm=False,
                  discretization="SID", pretrained=True, path_of_c3d_cfg=None, 
-                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False, double_ord=0):
+                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False, double_ord=0, render=False, align_corners=True):
         super().__init__()
         assert len(input_size) == 2
         assert isinstance(kernel_size, int)
@@ -51,7 +53,8 @@ class DepthPredModel(nn.Module):
                                                                  acc_ordreg=acc_ordreg, 
                                                                  dyn_weight=dyn_weight, 
                                                                  feat_dim=feat_dim, 
-                                                                 double_ord=double_ord)
+                                                                 double_ord=double_ord, 
+                                                                 align_corners=align_corners)
         self.regression_layer = OrdinalRegressionLayer(acc_ordreg=acc_ordreg, double_ord=double_ord)
 
         self.flag_use_c3d = path_of_c3d_cfg is not None
@@ -59,7 +62,8 @@ class DepthPredModel(nn.Module):
         self.flag_use_neighbor_depth = use_neighbor_depth
         self.flag_double_ord = double_ord > 0
         self.double_ord = double_ord
-            
+        self.render = render
+
         ###Minghan: original dorn loss
         self.criterion = OrdinalRegressionLoss(ord_num, gamma, beta, discretization)
         if self.flag_use_c3d:
@@ -79,6 +83,9 @@ class DepthPredModel(nn.Module):
 
         if self.flag_double_ord:
             self.criterion_so = SecondOrdinalRegressionLoss(self.ord_num, self.gamma, self.beta, self.discretization, double_ord)
+
+        if self.render:
+            self.renderer = DepthRend(n_dep_sample=0, out_class=ord_num, size=input_size, align_corners=align_corners, batch_norm=batch_norm)#TODO: parameters
 
     def optimizer_params(self):
         group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), 
@@ -112,7 +119,7 @@ class DepthPredModel(nn.Module):
 
         N, C, H, W = image.shape
         feat = self.backbone(image)
-        feat = self.SceneUnderstandingModule(feat)
+        x_dict = self.SceneUnderstandingModule(feat)
         # print("feat shape:", feat.shape)
         # feat = F.interpolate(feat, size=(H, W), mode="bilinear", align_corners=True)
 
@@ -126,75 +133,42 @@ class DepthPredModel(nn.Module):
         # # print("prob shape:", prob.shape, " label shape:", label.shape)
 
         # prob_train, prob, label = self.regression_layer(feat)
-        out = self.regression_layer(feat)
 
-        prob_train = out["log_pq"]
-        prob = out["p"]
-        label = out["label"]
+        if self.render:
+            if self.training:
+                self.regression_layer(x_dict["full"])
+                self.renderer(x_dict, target, mask_gt)
+                self.regression_layer(x_dict["samp"])
+            else:
+                self.renderer(x_dict)
+                self.regression_layer(x_dict["full"])
+        else:
+            self.regression_layer(x_dict["full"])
         
         if self.training:
-            losses = dict()
-            losses["loss_dorn"] = self.criterion(prob_train, target)
-            if self.flag_use_c3d:
-                if self.discretization == "SID":
-                    t0 = torch.exp(np.log(self.beta) * label.float() / self.ord_num)
-                    t1 = torch.exp(np.log(self.beta) * (label.float() + 1) / self.ord_num)
-                else:
-                    t0 = 1.0 + (self.beta - 1.0) * label.float() / self.ord_num
-                    t1 = 1.0 + (self.beta - 1.0) * (label.float() + 1) / self.ord_num
-                depth = (t0 + t1) / 2 - self.gamma
-                target_bchw = torch.unsqueeze(target, dim=1)
-                target_bchw[target_bchw<0] = 0
-                depth_bchw = torch.unsqueeze(depth, dim=1)
-                # depth_np = depth_bchw.cpu().numpy()
-                # gt_np = target_bchw.cpu().numpy()
-                # mask_np = mask.cpu().numpy()
-                # mask_gt_np = mask_gt.cpu().numpy()
-                # print(mask_gt_np.shape)
-                # print(mask_np.shape)
-                # for i in range(depth_np.shape[0]):
-                #     cv2.imwrite("pred_{}.png".format(i), depth_np[i].transpose(1,2,0).astype(np.uint8))
-                #     cv2.imwrite("gt_{}.png".format(i), gt_np[i].transpose(1,2,0).astype(np.uint8))
-                #     cv2.imwrite("mask_pred_{}.png".format(i), mask_np[i].transpose(1,2,0).astype(np.uint8)*255)
-                #     cv2.imwrite("mask_gt_{}.png".format(i), mask_gt_np[i].transpose(1,2,0).astype(np.uint8)*255)
-
-                losses["loss_c3d"] = self.criterion2(image, depth_bchw, target_bchw, mask, mask_gt, cam_info)
-            else:
-                losses["loss_c3d"] = torch.zeros_like(losses["loss_dorn"])
-
-            if self.flag_use_prob_loss:
-                losses_p, depth_pred = self.criterion_p(out["p_bin"], target)
-                losses["loss_mean"] = losses_p["loss_mean"]
-                losses["loss_deviation"] = losses_p["loss_deviation"]
-                losses["loss_nll"] = losses_p["loss_nll"]
-            elif self.flag_use_neighbor_depth:
-                losses_p, depth_pred = self.criterion_nd(out["p_bin"], label, target)
-                losses["loss_mean"] = losses_p["loss_mean"]
-                losses["loss_deviation"] = losses_p["loss_deviation"]
-                losses["loss_nll"] = losses_p["loss_nll"]
-            elif self.flag_double_ord:
-                loss_2nd_dorn = self.criterion_so(out["log_pq_2"], target, out["ord_idx_top"], out["ord_idx_bot"])
-                losses["loss_mean"] = loss_2nd_dorn
-                losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
-                losses["loss_nll"] = torch.zeros_like(losses["loss_dorn"])
-            else:
-                losses["loss_mean"] = torch.zeros_like(losses["loss_dorn"])
-                losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
-                losses["loss_nll"] = torch.zeros_like(losses["loss_dorn"])
-
-            loss = losses["loss_dorn"] - 1e-3* losses["loss_c3d"] + losses["loss_mean"] + losses["loss_deviation"] + losses["loss_nll"] ### TODO: weight
+            loss, losses = self.calc_loss(x_dict["full"], target, mask, mask_gt, cam_info)
+            if self.render:
+                target_samp = x_dict["samp"]["target"]
+                loss_samp, losses_samp = self.calc_loss(x_dict["samp"], target_samp, mask, mask_gt, cam_info)
+                loss = loss + loss_samp
+                for key in losses:
+                    losses[key] = losses[key] + losses_samp[key]
             return loss, losses
 
+        out = x_dict["full"]
+        prob = out["pbin"]
+        label = out["label"]
+
         if self.flag_use_prob_loss:
-            depth_pred = (out["p_bin"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
+            depth_pred = (out["pmul"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
             if self.discretization == "SID":
                 depth_pred = torch.exp(depth_pred)
             depth = depth_pred - self.gamma
         elif self.flag_use_neighbor_depth:
-            mask_zeros = torch.zeros_like(out["p_bin"])
+            mask_zeros = torch.zeros_like(out["pmul"])
             mask_label = torch.arange(self.ord_num).view(1, -1, 1, 1).to(device=label.device)
             label = label.unsqueeze(1)
-            p_bin_masked = torch.where( (mask_label >= label - 2) & (mask_label <= label + 2), out["p_bin"], mask_zeros )
+            p_bin_masked = torch.where( (mask_label >= label - 2) & (mask_label <= label + 2), out["pmul"], mask_zeros )
             p_bin_masked = F.normalize(p_bin_masked, dim=1, p=1)
 
             depth_pred = (p_bin_masked * self.criterion_nd.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
@@ -222,3 +196,61 @@ class DepthPredModel(nn.Module):
         # print("depth min:", torch.min(depth), " max:", torch.max(depth),
         #       " label min:", torch.min(label), " max:", torch.max(label))
         return {"target": [depth], "prob": [prob], "label": [label]}
+
+    def calc_loss(self, out, target, mask=None, mask_gt=None, cam_info=None):
+
+        prob_train = out["log_pq"]
+        prob = out["pbin"]
+        label = out["label"]
+
+        losses = dict()
+        losses["loss_dorn"] = self.criterion(prob_train, target)
+        if self.flag_use_c3d:
+            if self.discretization == "SID":
+                t0 = torch.exp(np.log(self.beta) * label.float() / self.ord_num)
+                t1 = torch.exp(np.log(self.beta) * (label.float() + 1) / self.ord_num)
+            else:
+                t0 = 1.0 + (self.beta - 1.0) * label.float() / self.ord_num
+                t1 = 1.0 + (self.beta - 1.0) * (label.float() + 1) / self.ord_num
+            depth = (t0 + t1) / 2 - self.gamma
+            target_bchw = torch.unsqueeze(target, dim=1)
+            target_bchw[target_bchw<0] = 0
+            depth_bchw = torch.unsqueeze(depth, dim=1)
+            # depth_np = depth_bchw.cpu().numpy()
+            # gt_np = target_bchw.cpu().numpy()
+            # mask_np = mask.cpu().numpy()
+            # mask_gt_np = mask_gt.cpu().numpy()
+            # print(mask_gt_np.shape)
+            # print(mask_np.shape)
+            # for i in range(depth_np.shape[0]):
+            #     cv2.imwrite("pred_{}.png".format(i), depth_np[i].transpose(1,2,0).astype(np.uint8))
+            #     cv2.imwrite("gt_{}.png".format(i), gt_np[i].transpose(1,2,0).astype(np.uint8))
+            #     cv2.imwrite("mask_pred_{}.png".format(i), mask_np[i].transpose(1,2,0).astype(np.uint8)*255)
+            #     cv2.imwrite("mask_gt_{}.png".format(i), mask_gt_np[i].transpose(1,2,0).astype(np.uint8)*255)
+
+            losses["loss_c3d"] = self.criterion2(image, depth_bchw, target_bchw, mask, mask_gt, cam_info)
+        else:
+            losses["loss_c3d"] = torch.zeros_like(losses["loss_dorn"])
+
+        if self.flag_use_prob_loss:
+            losses_p, depth_pred = self.criterion_p(out["pmul"], target)
+            losses["loss_mean"] = losses_p["loss_mean"]
+            losses["loss_deviation"] = losses_p["loss_deviation"]
+            losses["loss_nll"] = losses_p["loss_nll"]
+        elif self.flag_use_neighbor_depth:
+            losses_p, depth_pred = self.criterion_nd(out["pmul"], label, target)
+            losses["loss_mean"] = losses_p["loss_mean"]
+            losses["loss_deviation"] = losses_p["loss_deviation"]
+            losses["loss_nll"] = losses_p["loss_nll"]
+        elif self.flag_double_ord:
+            loss_2nd_dorn = self.criterion_so(out["log_pq_2"], target, out["ord_idx_top"], out["ord_idx_bot"])
+            losses["loss_mean"] = loss_2nd_dorn
+            losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
+            losses["loss_nll"] = torch.zeros_like(losses["loss_dorn"])
+        else:
+            losses["loss_mean"] = torch.zeros_like(losses["loss_dorn"])
+            losses["loss_deviation"] = torch.zeros_like(losses["loss_dorn"])
+            losses["loss_nll"] = torch.zeros_like(losses["loss_dorn"])
+
+        loss = losses["loss_dorn"] - 1e-3* losses["loss_c3d"] + losses["loss_mean"] + losses["loss_deviation"] + losses["loss_nll"] ### TODO: weight
+        return loss, losses

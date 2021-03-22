@@ -33,13 +33,13 @@ class OrdinalRegressionLayer(nn.Module):
         else:
             return self.forward_original_DORN(x)
 
-    def forward_acc_ordreg(self, x):
+    def forward_acc_ordreg(self, x_dict):
         if self.double_ord > 0:
-            assert isinstance(x, dict)
-            ord_prob = x["p_1"]
-            ord_cdf = x["cdf_1"]
-            ord_prob_2 = x["p_2"] 
-            ord_cdf_2 = x["cdf_2"]
+            assert isinstance(x_dict, dict)
+            ord_prob = x_dict["pmul"]
+            ord_cdf = x_dict["pbin"]
+            ord_prob_2 = x_dict["pmul_local"] 
+            ord_cdf_2 = x_dict["pbin_local"]
             N, C, H, W = ord_prob.size()
             ord_num = C
             ord_idx_top = torch.sum((ord_cdf >= 0.7), dim=1, keepdim=True) - 1
@@ -52,6 +52,7 @@ class OrdinalRegressionLayer(nn.Module):
 
             ord_label_2 = torch.sum((ord_cdf_2_scaled > 0.5), dim=1) - 1
         else:
+            x = x_dict["logit"]
             N, C, H, W = x.size()
             ord_num = C
             ord_prob = F.softmax(x, dim=1)
@@ -65,27 +66,27 @@ class OrdinalRegressionLayer(nn.Module):
 
         ord_log = torch.cat([ord_logp, ord_logq], dim=1)
 
-        out = dict()
-        out["log_pq"] = ord_log
-        out["p"] = ord_cdf
-        out["label"] = ord_label
-        out["p_bin"] = ord_prob
+        x_dict["pmul"] = ord_prob
+        x_dict["pbin"] = ord_cdf
+        x_dict["log_pq"] = ord_log
+        x_dict["label"] = ord_label
 
         if self.double_ord > 0:
             ord_logp_2 = torch.log(torch.clamp(ord_cdf_2_scaled, min=1e-5))
             ord_logq_2 = torch.log(torch.clamp(1-ord_cdf_2_scaled, min=1e-5))
             ord_log_2 = torch.cat([ord_logp_2, ord_logq_2], dim=1)
-            out["log_pq_2"] = ord_log_2
-            out["p_2"] = ord_cdf_2_scaled
-            out["ord_idx_top"] = ord_idx_top
-            out["ord_idx_bot"] = ord_idx_bot
-            out["label_2"] = ord_label_2
+            x_dict["log_pq_2"] = ord_log_2
+            x_dict["pbin_2"] = ord_cdf_2_scaled
+            x_dict["ord_idx_top"] = ord_idx_top
+            x_dict["ord_idx_bot"] = ord_idx_bot
+            x_dict["label_2"] = ord_label_2
 
-        return out
+        return #x_dict
 
         # return ord_log, ord_cdf, ord_label
 
-    def forward_original_DORN(self, x):
+    def forward_original_DORN(self, x_dict):
+        x = x_dict["logit"]
         N, C, H, W = x.size()
         ord_num = C // 2
 
@@ -127,10 +128,9 @@ class OrdinalRegressionLayer(nn.Module):
         ord_prob = F.softmax(x, dim=1)[:, 0, :, :, :]
         ord_label = torch.sum((ord_prob > 0.5), dim=1) - 1
 
-        out = dict()
-        out["log_pq"] = prob
-        out["p"] = ord_prob
-        out["label"] = ord_label
-        return out
+        x_dict["log_pq"] = prob
+        x_dict["pmul"] = ord_prob
+        x_dict["label"] = ord_label
+        return #x_dict
 
         # return prob, ord_prob, ord_label

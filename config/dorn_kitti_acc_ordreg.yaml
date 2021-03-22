@@ -21,7 +21,9 @@ model:
     dyn_weight: False
     use_prob_loss: False
     use_neighbor_depth: False
-    double_ord: 40
+    double_ord: 0 #40
+    render: True
+    align_corners: False
 data:
   name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]
@@ -37,6 +39,7 @@ solver:
   epochs: 14
   # batch_size: 4
   batch_size: 2
+  # batch_size: 1
   step_decay: 1
   optimizer:
     name: 'SGD'

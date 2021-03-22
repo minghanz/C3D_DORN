@@ -43,7 +43,7 @@ class FullImageEncoder(nn.Module):
 
 
 class SceneUnderstandingModule(nn.Module):
-    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False, feat_dim=32, double_ord=0):
+    def __init__(self, ord_num, size, kernel_size, pyramid=[6, 12, 18], dropout_prob=0.5, batch_norm=False, acc_ordreg=False, dyn_weight=False, feat_dim=32, double_ord=0, align_corners=True):
         """
         acc_ordreg: instead of original DORN regression, we regard each P as the probability of the real value falling in the bin P(j-1<l<j). Then the P(l>j) = sum_1^j(P(j-1<l<j)). 
         """
@@ -59,6 +59,7 @@ class SceneUnderstandingModule(nn.Module):
         self.dyn_weight = dyn_weight
         self.acc_ordreg = acc_ordreg
         self.double_ord = double_ord    # number of classes in second_ord
+        self.align_corners = align_corners
 
         if self.dyn_weight:
             self.feat_dim = feat_dim
@@ -133,44 +134,47 @@ class SceneUnderstandingModule(nn.Module):
     def forward(self, x):
         N, C, H, W = x.shape
         x1 = self.encoder(x)
-        x1 = F.interpolate(x1, size=(H, W), mode="bilinear", align_corners=True)
+        x1 = F.interpolate(x1, size=(H, W), mode="bilinear", align_corners=self.align_corners)
 
         x2 = self.aspp1(x)
         x3 = self.aspp2(x)
         x4 = self.aspp3(x)
         x5 = self.aspp4(x)
 
+        out = dict()
+        out["net"] = dict()
+        out["full"] = dict()
         if self.dyn_weight:
             x6 = torch.cat((x1, x3, x4, x5), dim=1)
             dyn_weight = self.concat_process(x6)
-            out = self.dyn_weight_attention(x2, dyn_weight)
-            out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
+            out["net"]["logit"] = self.dyn_weight_attention(x2, dyn_weight)
+            out["full"]["logit"] = F.interpolate(out["net"]["logit"], size=self.size, mode="bilinear", align_corners=self.align_corners)
         elif self.double_ord > 0:
             x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
             feat = self.concat_process(x6)
             out_1 = self.proj_head(feat)
-            out_1_out = F.interpolate(out_1, size=self.size, mode="bilinear", align_corners=True)
+            out_1_out = F.interpolate(out_1, size=self.size, mode="bilinear", align_corners=self.align_corners)
             out_1_softmax = F.softmax(out_1_out, dim=1)
             ord_1_cdf = torch.cumsum(out_1_softmax.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
             ord_1_cdf = F.normalize(ord_1_cdf, p=float("Inf"), dim=1)
 
-            ord_1_cdf_small = F.interpolate(ord_1_cdf, size=(out_1.shape[-2], out_1.shape[-1]), mode="bilinear", align_corners=True)
+            ord_1_cdf_small = F.interpolate(ord_1_cdf, size=(out_1.shape[-2], out_1.shape[-1]), mode="bilinear", align_corners=self.align_corners)
             x_second = torch.cat([feat, ord_1_cdf_small], dim=1)
             out_2 = self.second_ord(x_second)
-            out_2_out = F.interpolate(out_2, size=self.size, mode="bilinear", align_corners=True)
+            out_2_out = F.interpolate(out_2, size=self.size, mode="bilinear", align_corners=self.align_corners)
             out_2_softmax = F.softmax(out_2_out, dim=1)
             ord_2_cdf = torch.cumsum(out_2_softmax.flip([1]), dim=1).flip([1])   # cumsum in the reversed direction
             ord_2_cdf = F.normalize(ord_2_cdf, p=float("Inf"), dim=1)
 
-            out = dict()
-            out["p_1"] = out_1_softmax
-            out["cdf_1"] = ord_1_cdf
-            out["p_2"] = out_2_softmax
-            out["cdf_2"] = ord_2_cdf
+            out["full"]["pmul"] = out_1_softmax
+            out["full"]["pbin"] = ord_1_cdf
+            out["full"]["pmul_local"] = out_2_softmax
+            out["full"]["pbin_local"] = ord_2_cdf
         else:
-            x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
-            out = self.concat_process(x6)
-            out = F.interpolate(out, size=self.size, mode="bilinear", align_corners=True)
+            x6 = torch.cat((x1, x2, x3, x4, x5), dim=1) # 44*88
+            out["net"]["feat"] = x6
+            out["net"]["logit"] = self.concat_process(x6)
+            out["full"]["logit"] = F.interpolate(out["net"]["logit"], size=self.size, mode="bilinear", align_corners=self.align_corners)   # 352*704. The interpolation is after making the final predictions. 
         return out
 
     def dyn_weight_attention(self, x, dyn_weight):

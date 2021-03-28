@@ -26,7 +26,7 @@ logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
 sys.path.insert(0, os.path.abspath(".."))  
 # sys.path.insert(0, os.path.abspath("../../"))   # for c3d
 from c3d.utils_general.eval import eval_preprocess, Metrics
-from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np
+from c3d.utils_general.vis import vis_depth, uint8_np_from_img_tensor, save_np_to_img, vis_normal, uint8_np_from_img_np, overlay_dep_on_rgb, vis_depth_err, overlay_dep_on_rgb_np
 from c3d.utils.geometry import NormalFromDepthDense
 # from c3d.utils_general.pcl_funcs import pcl_from_grid_xy1_dep, pcl_vis_seq, pcl_write, pcl_load_viewer_fromfile     ## need to install pcl
 
@@ -51,6 +51,7 @@ parser.add_argument("--local_rank", default=0, type=int)
 ### options for outputing visualization
 parser.add_argument("--vpath", type=str, default="vis")
 parser.add_argument("--vpbin", action="store_true", help="visualize probability for each bin")
+parser.add_argument("--vent", action="store_true", help="visualize entropy of depth classification and prediction error")
 parser.add_argument("--vrgb", action="store_true", help="visualize rgb input images")
 parser.add_argument("--vdepth", action="store_true", help="visualize depth gt and predictions")
 parser.add_argument("--vmask", action="store_true", help="visualize which pixels are counted in quantitative results")
@@ -213,6 +214,26 @@ for idx in pbar:
     cmp_time = t_end - t_start
 
     mean_tracker.update(extra_dict['mean_pred']/extra_dict['mean_gt'])
+
+    ### entropy and prediction error
+    if args.vent:
+        img_full = minibatch_l["image_full"][0]
+        img_full_np = uint8_np_from_img_tensor(img_full)
+
+        entropy_l = pred_l["entropy"][-1]
+        entropy_r = pred_r["entropy"][-1]
+        entropy_full_hw = compose_preds(entropy_l, entropy_r, full_width, full_height)[0]
+        
+        dep_err = vis_depth_err(pred_full_hw.unsqueeze(0), gt_full_hw.unsqueeze(0))
+        entropy_full_hw = entropy_full_hw.unsqueeze(0)
+
+        dep_err_np = overlay_dep_on_rgb_np(dep_err, img_full_np, overlay=True)
+        entropy_img_np = overlay_dep_on_rgb(entropy_full_hw, img_full, overlay=False)
+        entropy_np = overlay_dep_on_rgb(entropy_full_hw, img_full, overlay=True)
+        save_np_to_img(dep_err_np, "{}/{}_pdep_err".format(args.vpath, idx))
+        save_np_to_img(entropy_img_np, "{}/{}_pent_img".format(args.vpath, idx))
+        save_np_to_img(entropy_np, "{}/{}_pent".format(args.vpath, idx))
+    
 
     #################################################### visualization
     if args.vpbin:

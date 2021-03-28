@@ -159,6 +159,14 @@ class DepthPredModel(nn.Module):
         prob = out["pbin"]
         label = out["label"]
 
+        ### visualize entropy
+        assert "pmul" in out, "{}".format(list(out.keys()))
+        if "pmul" in out:
+            pmul = out["pmul"]
+            p_bin_clamped = torch.clamp(pmul, min=1e-6, max=1-1e-6)
+            entropy = - (p_bin_clamped * torch.log(p_bin_clamped)).sum(1) # B*H*W
+            out["entropy"] = entropy
+
         if self.flag_use_prob_loss:
             depth_pred = (out["pmul"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
             if self.discretization == "SID":
@@ -195,7 +203,10 @@ class DepthPredModel(nn.Module):
             depth = (t0 + t1) / 2 - self.gamma
         # print("depth min:", torch.min(depth), " max:", torch.max(depth),
         #       " label min:", torch.min(label), " max:", torch.max(label))
-        return {"target": [depth], "prob": [prob], "label": [label]}
+        out_dict = {"target": [depth], "prob": [prob], "label": [label]}
+        if "entropy" in out:
+            out_dict["entropy"] = [out["entropy"]]
+        return out_dict
 
     def calc_loss(self, out, target, mask=None, mask_gt=None, cam_info=None):
 

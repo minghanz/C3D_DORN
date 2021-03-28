@@ -60,6 +60,7 @@ parser.add_argument("--vnormal", action="store_true", help="visualize surface no
 # parser.add_argument("--save-pcl-pred", action="store_true", help="save point cloud prediction to file (need install pcl library)")
 # parser.add_argument("--save-pcl-gt", action="store_true", help="save point cloud gt to file (need install pcl library)")
 # parser.add_argument("--vpcl", action="store_true", help="visualize pcl as an image (need install pcl library)")
+parser.add_argument("--txtpath", type=str, default="eval_result.txt", required=False, help="txt path to save the evaluation result")
 
 args = parser.parse_args()
 
@@ -125,6 +126,17 @@ config_right["data"]["te_crop_mode"] = "bottom_right"
 
 if is_main_process:
     print_config(config)
+
+### output txt file
+if args.txtpath is not None:
+    assert not os.path.exists(args.txtpath), "The evaluation result txt file already exist: {}".format(args.txtpath)
+    txt_folder = os.path.dirname(args.txtpath)
+    if not os.path.exists(txt_folder):
+        os.makedirs(txt_folder)
+        print("The folder for evaluation result txt files created: {}".format(txt_folder))
+    else:
+        print("The folder for evaluation result txt files exists: {}".format(txt_folder))
+
 
 # dataset
 # tr_loader, sampler, niter_per_epoch = build_loader(config, True, solver.world_size, solver.distributed)
@@ -325,8 +337,15 @@ for idx in pbar:
 if is_main_process:
     print(metric.get_header_row())
     print(metric.get_result_row())
+    print("Mean pred/gt ratio:", mean_tracker.mean())
 
-print("Mean pred/gt ratio:", mean_tracker.mean())
+    if args.txtpath is not None:
+        assert not os.path.exists(args.txtpath), args.txtpath
+        with open(args.txtpath, "w") as f:
+            print(metric.get_header_row(), file=f)
+            print(metric.get_result_row(), file=f)
+            print("Mean pred/gt ratio: {}".format(mean_tracker.mean()), file=f)
+            
 
 # if is_main_process:
 #     logging.info('After Epoch{}/{}, {}'.format(epoch, config['solver']['epochs'], metric.get_result_info()))

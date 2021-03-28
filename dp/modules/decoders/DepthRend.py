@@ -8,12 +8,12 @@ from dp.modules.decoders.DepthRendSampler import DepthRendSampler
 from dp.modules.decoders.DepthRendHead import DepthRendHead
 
 class DepthRend(nn.Module):
-    def __init__(self, n_dep_sample=30, n_pt_sample=900, in_feat_channel=512*5, out_class=90, size=(385, 513), align_corners=False, batch_norm=False):
+    def __init__(self, n_dep_sample=30, n_pt_sample=900, in_feat_channel=512*5, out_class=90, size=(385, 513), align_corners=False, batch_norm=False, dropout_prob=0.5):
         super(DepthRend, self).__init__()
         self.align_corners = align_corners
 
         self.sampler = DepthRendSampler(n_dep_sample, n_pt_sample, align_corners)
-        self.mlp = DepthRendHead(in_feat_channel, out_class, batch_norm)
+        self.mlp = DepthRendHead(in_feat_channel, out_class, batch_norm, dropout_prob=dropout_prob)
 
         self.size = size
 

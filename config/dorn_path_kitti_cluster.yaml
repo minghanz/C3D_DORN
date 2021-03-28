@@ -4,4 +4,6 @@ snap:
   # path: "/data/snap_dir/monodepth"
   # path: "./snap_dir/monodepth"
   path: "/scratch/hpeng_root/hpeng1/minghanz/tmp/DORN_pytorch/snap_dir/monodepth"
-
+# solver:
+  # epochs: 14
+  # batch_size: 2

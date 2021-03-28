@@ -23,11 +23,13 @@ model:
     use_neighbor_depth: False
     double_ord: 0 #40
     render: True
+    rend_dropout: 0.5
     align_corners: False
 data:
   name: ["Kitti", "Kitti"]
   # split: ["trainval", "selected_val"]
-  split: ["train", "trainval"]
+  split: ["trainfilled", "trainval"]
+  # split: ["train", "trainval"]
   # split: ["trainsparse", "trainval"]
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]

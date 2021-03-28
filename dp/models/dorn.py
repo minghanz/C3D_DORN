@@ -36,7 +36,7 @@ class DepthPredModel(nn.Module):
                  input_size=(385, 513), kernel_size=16, pyramid=[8, 12, 16],
                  batch_norm=False,
                  discretization="SID", pretrained=True, path_of_c3d_cfg=None, 
-                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False, double_ord=0, render=False, align_corners=True):
+                 acc_ordreg=False, dyn_weight=False, use_prob_loss=False, feat_dim=32, use_neighbor_depth=False, double_ord=0, render=False, align_corners=True, rend_dropout=0.5):
         super().__init__()
         assert len(input_size) == 2
         assert isinstance(kernel_size, int)
@@ -85,7 +85,7 @@ class DepthPredModel(nn.Module):
             self.criterion_so = SecondOrdinalRegressionLoss(self.ord_num, self.gamma, self.beta, self.discretization, double_ord)
 
         if self.render:
-            self.renderer = DepthRend(n_dep_sample=0, out_class=ord_num, size=input_size, align_corners=align_corners, batch_norm=batch_norm)#TODO: parameters
+            self.renderer = DepthRend(n_dep_sample=0, out_class=ord_num, size=input_size, align_corners=align_corners, batch_norm=batch_norm, dropout_prob=rend_dropout)
 
     def optimizer_params(self):
         group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), 

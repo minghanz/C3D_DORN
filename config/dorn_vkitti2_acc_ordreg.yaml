@@ -14,29 +14,32 @@ model:
     kernel_size: 16
     # pyramid: [8, 12, 16]
     pyramid: [6, 12, 18]
-    # pyramid: [4, 8, 12]
     batch_norm: False
     discretization: "SID"
     pretrained: True
-    path_of_c3d_cfg: "./config/c3d_config.txt"
+    acc_ordreg: True
+    dyn_weight: False
+    use_prob_loss: False
+    use_neighbor_depth: False
+    double_ord: 0 #40
+    render: True
+    rend_dropout: 0.5
+    align_corners: False
 data:
-  name: ["KittiRawLidar", "Kitti"]
-  # split: ["trainval_from_bts", "selected_val"]
-  split: ["train_from_bts", "trainval_from_bts"]
+  name: ["vKitti2", "vKitti2"]
+  # split: ["trainval", "selected_val"]
+  split: ["train", "trainval"]
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]
   te_crop_size: [352, 704]
-  # te_crop_size: [352, 1216]
-  # te_crop_mode: "kb_crop"
   te_crop_mode: "center"
   norm_type: "imagenet-norm"
 solver:
   epochs: 14
-  # epochs: 40  # in cluster 40 epochs were run for final results
   # batch_size: 4
   batch_size: 2
-  # batch_size: 3 # in cluster batch size 3 is used.
+  # batch_size: 1
   step_decay: 1
   optimizer:
     name: 'SGD'
@@ -44,10 +47,6 @@ solver:
       lr: 0.0001
       momentum: 0.9
       weight_decay: 0.0005
-    # name: 'Adam' # in cluster, Adam optimizer is tried but did not show better result. 
-    # params:
-    #   lr: 0.0001
-    #   weight_decay: 0.0005
   lr_policy:
     name: 'poly'
     params:

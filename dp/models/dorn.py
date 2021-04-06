@@ -160,7 +160,7 @@ class DepthPredModel(nn.Module):
         label = out["label"]
 
         ### visualize entropy
-        assert "pmul" in out, "{}".format(list(out.keys()))
+        # assert "pmul" in out, "{}".format(list(out.keys()))
         if "pmul" in out:
             pmul = out["pmul"]
             p_bin_clamped = torch.clamp(pmul, min=1e-6, max=1-1e-6)

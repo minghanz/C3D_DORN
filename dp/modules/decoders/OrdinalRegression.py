@@ -129,7 +129,7 @@ class OrdinalRegressionLayer(nn.Module):
         ord_label = torch.sum((ord_prob > 0.5), dim=1) - 1
 
         x_dict["log_pq"] = prob
-        x_dict["pmul"] = ord_prob
+        x_dict["pbin"] = ord_prob
         x_dict["label"] = ord_label
         return #x_dict
 

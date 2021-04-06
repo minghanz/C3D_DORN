@@ -25,9 +25,9 @@ model:
     double_ord: 0
 data:
   name: ["Kitti", "Kitti"]
-  # split: ["trainval", "selected_val"]
-  split: ["train", "trainval"]
-  # split: ["trainsparse", "trainval"]
+  # split: ["trainval_from_bts", "selected_val"]
+  split: ["train_from_bts", "trainval_from_bts"]
+  # split: ["trainsparse_from_bts", "trainval_from_bts"]
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]
   tr_crop_size: [352, 704]

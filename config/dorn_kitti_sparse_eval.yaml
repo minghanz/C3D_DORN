@@ -21,8 +21,8 @@ model:
     path_of_c3d_cfg: "./config/c3d_config.txt"
 data:
   name: ["KittiRawLidar", "Kitti"]
-  # split: ["trainval", "selected_val"]
-  split: ["trainsparse", "trainval"]
+  # split: ["trainval_from_bts", "selected_val"]
+  split: ["trainsparse_from_bts", "trainval_from_bts"]
   # path: '/scratch/hpeng_root/hpeng1/minghanz/kitti_data/'
   # tr_crop_size: [385, 513]
   # te_crop_size: [385, 513]

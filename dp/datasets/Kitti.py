@@ -32,7 +32,7 @@ class Kitti(BaseDataset):
     def __init__(self, config, is_train=True, image_loader=PILLoader, depth_loader=KittiDepthLoader):
         super().__init__(config, is_train, image_loader, depth_loader)
         # file_list = "./dp/datasets/lists/kitti_{}.list".format(self.split)
-        file_list = "./dp/datasets/lists/{}_{}_from_bts.list".format(self.name.lower(), self.split)
+        file_list = "./dp/datasets/lists/{}_{}.list".format(self.name.lower(), self.split)
         with open(file_list, "r") as f:
             self.filenames = f.readlines()
             ### skip the files with no ground truth

@@ -1,7 +1,7 @@
 data:
   name: [None, "Kitti"]
-  # split: [None, "eval_visualize"]     # for qualitative output as in the paper
-  split: [None, "trainval"]     # for quantitative output
+  # split: [None, "eval_visualize_from_bts"]     # for qualitative output as in the paper
+  split: [None, "trainval_from_bts"]     # for quantitative output
   tr_crop_size: [352, 704]
   te_crop_size: [352, 704]
   norm_type: "imagenet-norm"

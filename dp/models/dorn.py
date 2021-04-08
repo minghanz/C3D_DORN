@@ -167,6 +167,9 @@ class DepthPredModel(nn.Module):
             entropy = - (p_bin_clamped * torch.log(p_bin_clamped)).sum(1) # B*H*W
             out["entropy"] = entropy
 
+        if "sample_painter" in out:
+            out["sample_painter"] = out["sample_painter"].squeeze(1)  # B*H*W
+
         if self.flag_use_prob_loss:
             depth_pred = (out["pmul"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
             if self.discretization == "SID":
@@ -206,6 +209,8 @@ class DepthPredModel(nn.Module):
         out_dict = {"target": [depth], "prob": [prob], "label": [label]}
         if "entropy" in out:
             out_dict["entropy"] = [out["entropy"]]
+        if "sample_painter" in out:
+            out_dict["sample_painter"] = [out["sample_painter"]]
         return out_dict
 
     def calc_loss(self, out, target, mask=None, mask_gt=None, cam_info=None):

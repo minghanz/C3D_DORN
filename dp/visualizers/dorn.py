@@ -17,7 +17,7 @@ class dorn_visualizer(BaseVisualizer):
     def __init__(self, config, writer=None):
         super(dorn_visualizer, self).__init__(config, writer)
 
-    def visualize(self, batch, out, epoch=0):
+    def visualize(self, batch, out, epoch=0, idx=0):
         """
             :param batch_in: minibatch
             :param pred_out: model output for visualization, dic, {"target": [NxHxW]}
@@ -25,6 +25,7 @@ class dorn_visualizer(BaseVisualizer):
             :return: vis_ims: image for visualization.
             """
         fn = batch["fn"]
+        idx = "%02d"%idx
         if batch["target"].shape != out["target"][-1].shape:
             h, w = batch["target"].shape[-2:]
             # batch = interpolate(batch, size=(h, w), mode='nearest')
@@ -45,19 +46,32 @@ class dorn_visualizer(BaseVisualizer):
             if has_gt:
                 depth_gt = depth_gts[i]
 
-                err = error_to_color(depth, depth_gt)
+                err = error_to_color(depth, depth_gt, rgb=True, fix_min=0, fix_max=10)
                 depth_gt = depth_to_color(depth_gt)
 
             depth = depth_to_color(depth)
             # print("pred:", depth.shape, " target:", depth_gt.shape)
-            group = np.concatenate((image, depth), axis=0)
+
+            ### entropy:
+            if out.get("entropy") is not None:
+                entropy = tensor2numpy(out['entropy'][0][i])
+                entropy = depth_to_color(entropy, rgb=True, fix_min=0, fix_max=1)
+                group = np.concatenate((entropy, depth), axis=0)
+            else:
+                group = np.concatenate((image, depth), axis=0)
 
             if has_gt:
-                gt_group = np.concatenate((depth_gt, err), axis=0)
+                if out.get("sample_painter") is not None:
+                    sample_painter = tensor2numpy(out['sample_painter'][0][i])  # H*W
+                    sample_painter = depth_to_color(sample_painter, rgb=False, fix_min=0, fix_max=1)
+                    gt_group = np.concatenate((sample_painter, err), axis=0)
+                else:
+                    gt_group = np.concatenate((depth_gt, err), axis=0)
+
                 group = np.concatenate((group, gt_group), axis=1)
 
             if self.writer is not None:
                 group = group.transpose((2, 0, 1)) / 255.0
                 group = group.astype(np.float32)
                 # print("group shape:", group.shape)
-                self.writer.add_image(fn[i] + "/image", group, epoch)
+                self.writer.add_image(idx+"_"+fn[i] + "/image", group, epoch)

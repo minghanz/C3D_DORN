@@ -37,12 +37,13 @@ class DepthRendHead(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.Dropout2d(p=dropout_prob),
-            conv_bn_relu(batch_norm, self.in_feat_channel+self.add_chnl, 512, kernel_size=1, padding=0), 
+            conv_bn_relu(batch_norm, self.in_feat_channel+self.add_chnl, 2048, kernel_size=1, padding=0), 
             nn.Dropout2d(p=dropout_prob),
-            conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
-            nn.Dropout2d(p=dropout_prob),
-            conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
-            nn.Conv2d(512, out_class, 1), # B*out*H*W or B*out*1*N
+            # conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
+            # nn.Dropout2d(p=dropout_prob),
+            # conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
+            # nn.Conv2d(512, out_class, 1), # B*out*H*W or B*out*1*N 
+            nn.Conv2d(2048, out_class, 1), # B*out*H*W or B*out*1*N
             # nn.Sigmoid()
         )
 

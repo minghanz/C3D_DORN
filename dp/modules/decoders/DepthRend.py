@@ -43,8 +43,11 @@ class DepthRend(nn.Module):
         else:
             logit = x_dict["net"]["logit"]
             feature = x_dict["net"]["feat"]
+            sample_painter = torch.zeros((logit.shape[0], 1, logit.shape[2], logit.shape[3]), dtype=logit.dtype, device=logit.device)
+
             ### recursively upsample the low-res depth prediction to high-res depth prediction
             for scale in range(nsamp_downscale-1, -1, -1):    # nsamp_downscale-1, ..., 0
+                sample_painter = F.interpolate(sample_painter, (logit.shape[2]*2, logit.shape[3]*2), mode='bilinear', align_corners=self.align_corners )  # B*ord_num*H*W
                 logit = F.interpolate(logit, (logit.shape[2]*2, logit.shape[3]*2), mode='bilinear', align_corners=self.align_corners )  # B*ord_num*H*W
                 pmul = F.softmax(logit, dim=1)
 
@@ -58,9 +61,13 @@ class DepthRend(nn.Module):
                 ### put the x into the right place of upsampled p_bin
                 logit = self.sampler.sampling_set_from_idx_flat(logit, idx_flat, x)
 
+                sample_dots = torch.ones((x.shape[0], 1, x.shape[2], x.shape[3]), dtype=x.dtype, device=x.device)
+                sample_painter = self.sampler.sampling_set_from_idx_flat(sample_painter, idx_flat, sample_dots)
+
             assert logit.shape[2] == self.size[0]
             assert logit.shape[3] == self.size[1]
 
             x_dict["full"]["logit"] = logit
+            x_dict["full"]["sample_painter"] = sample_painter
 
         return #x_dict

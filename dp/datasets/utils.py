@@ -24,6 +24,13 @@ def KittiDepthLoader(file):
     depth[depth_png == 0] = -1.
     return depth
 
+class vKitti2DepthLoader:
+    def __init__(self, datareader):
+        self.datareader = datareader    # The darareader is from c3d package
+    def __call__(self, depth_path):
+        depth = self.datareader.read_value_img(depth_path)
+        depth[depth > 80] = -1.
+        return depth
 
 def nomalize(image, type="mean"):
     assert type in ["mean", "norm", "imagenet-mean", "imagenet-norm"], \

@@ -42,6 +42,7 @@ def validation(is_main_process, niter_test, bar_format, metric, te_loader, solve
         pbar = range(niter_test)
     metric.reset()
     test_iter = iter(te_loader)
+    count_vis = 0
     for idx in pbar:
         t_start = time.time()
         minibatch = test_iter.next()
@@ -70,8 +71,9 @@ def validation(is_main_process, niter_test, bar_format, metric, te_loader, solve
         """
         visualization for model output and feature maps.
         """
-        if is_main_process and idx % 10 == 0:
-            visualizer.visualize(minibatch, pred, epoch=epoch)
+        if is_main_process and idx % 10 == 0 and count_vis < 10:
+            visualizer.visualize(minibatch, pred, epoch=epoch, idx=idx//10)
+            count_vis += 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Training script')

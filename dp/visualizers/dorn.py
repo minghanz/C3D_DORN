@@ -8,7 +8,7 @@
 """
 import numpy as np
 
-from dp.visualizers.utils import depth_to_color, error_to_color
+from dp.visualizers.utils import depth_to_color, error_to_color, normalize_to_01, scalar_01_to_color
 from dp.visualizers.base_visualizer import BaseVisualizer
 from dp.utils.pyt_ops import tensor2numpy, interpolate
 
@@ -57,6 +57,14 @@ class dorn_visualizer(BaseVisualizer):
                 entropy = tensor2numpy(out['entropy'][0][i])
                 entropy = depth_to_color(entropy, rgb=True, fix_min=0, fix_max=1)
                 group = np.concatenate((entropy, depth), axis=0)
+            elif out.get("feat_painter") is not None:
+                feat_painter = tensor2numpy(out['feat_painter'][0][i])
+                for cn in range(3):
+                    feat_painter[cn] = normalize_to_01(feat_painter[cn]) * 255
+                feat_painter = feat_painter.transpose(1, 2, 0)
+                # print("feat_painter.shape", feat_painter.shape)
+                # print("depth.shape", depth.shape)
+                group = np.concatenate((feat_painter, depth), axis=0)
             else:
                 group = np.concatenate((image, depth), axis=0)
 

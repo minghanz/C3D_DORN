@@ -7,4 +7,4 @@
 @File    : __init__.py.py
 """
 
-from .utils import error_to_color, depth_to_color
+from .utils import error_to_color, depth_to_color, normalize_to_01, scalar_01_to_color

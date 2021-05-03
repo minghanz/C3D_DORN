@@ -5,6 +5,8 @@ This module is to sample depth values from the probability vector of predefined 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from PIL import Image
+import numpy as np
 
 class DepthRendSampler(nn.Module):
     def __init__(self, n_dep_sample=30, n_pt_sample=900, align_corners=False):
@@ -150,10 +152,10 @@ class DepthRendSampler(nn.Module):
     def idx_normalize_to_hw(self, idx_hw_normalize, h, w):
         idx_hw_normalize = (idx_hw_normalize + 1) * 0.5 # [0, 1]
         if self.align_corners:
-            idx_h = idx_hw_normalize[..., 0] * (h-1)
-            idx_w = idx_hw_normalize[..., 1] * (w-1)
+            idx_h = idx_hw_normalize[..., 1] * (h-1)
+            idx_w = idx_hw_normalize[..., 0] * (w-1)
         else:
-            idx_h = idx_hw_normalize[..., 0] * h - 0.5
+            idx_h = idx_hw_normalize[..., 1] * h - 0.5
             idx_w = idx_hw_normalize[..., 0] * w - 0.5
 
         idx_hw = torch.stack([idx_h, idx_w], dim=3) # # B*1*n_samp*2
@@ -168,7 +170,8 @@ class DepthRendSampler(nn.Module):
             idx_h_normalize = (idx_hw[..., 0] + 0.5) / h * 2 - 1 # [-1, 1]
             idx_w_normalize = (idx_hw[..., 1] + 0.5) / w * 2 - 1 # [-1, 1]
 
-        idx_hw_normalize = torch.stack([idx_h_normalize, idx_w_normalize], dim=3)    # B*1*n_samp*2
+        # idx_hw_normalize = torch.stack([idx_h_normalize, idx_w_normalize], dim=3)    # B*1*n_samp*2
+        idx_hw_normalize = torch.stack([idx_w_normalize, idx_h_normalize], dim=3)    # B*1*n_samp*2
         return idx_hw_normalize
 
     def idx_hw_to_flat(self, idx_hw, h, w):
@@ -210,3 +213,34 @@ class DepthRendSampler(nn.Module):
         ent_idx = torch.gather(ent_topk.indices, dim=2, index=ent_idx_of_idx)   # B*1*n_samp
 
         return ent_idx
+
+
+def get_gradient_3d(width, height, start_list, stop_list, is_horizontal_list):
+    result = np.zeros((height, width, len(start_list)), dtype=np.float)
+
+    for i, (start, stop, is_horizontal) in enumerate(zip(start_list, stop_list, is_horizontal_list)):
+        result[:, :, i] = get_gradient_2d(start, stop, width, height, is_horizontal)
+
+    return result
+
+def get_gradient_2d(start, stop, width, height, is_horizontal):
+    if is_horizontal:
+        return np.tile(np.linspace(start, stop, width), (height, 1))
+    else:
+        return np.tile(np.linspace(start, stop, height), (width, 1)).T
+
+if __name__  == "__main__":
+    ### Test that the sampling works correctly. 
+    n_dep_sample = 0
+    n_pt_sample = 111
+    align_corners = False
+    sampler = DepthRendSampler(n_dep_sample, n_pt_sample, align_corners)
+
+    array = get_gradient_3d(160, 120, (0, 0, 192), (255, 255, 64), (True, False, False))
+
+    Image.fromarray(np.uint8(array)).save('color_gradient.jpg', quality=95)
+
+    array_pt = torch.from_numpy(array.transpose(2, 0, 1)[None])
+    print(array_pt.shape) #torch.Size([1, 3, 120, 160])
+    # idx_hw, idx_flat = 
+    # idx_hw = np.

@@ -116,17 +116,23 @@ class SceneUnderstandingModule(nn.Module):
                 nn.Conv2d(512, second_ord_num, 1)
             )
         else:
+            self.concat_process_layer1 = nn.Sequential(
+                    nn.Dropout2d(p=dropout_prob),
+                    conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),)
+            
             if self.acc_ordreg:
                 self.concat_process = nn.Sequential(
-                    nn.Dropout2d(p=dropout_prob),
-                    conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    # nn.Dropout2d(p=dropout_prob),
+                    # conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    self.concat_process_layer1,
                     nn.Dropout2d(p=dropout_prob),
                     nn.Conv2d(2048, ord_num, 1)
                 )
             else:
                 self.concat_process = nn.Sequential(
-                    nn.Dropout2d(p=dropout_prob),
-                    conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    # nn.Dropout2d(p=dropout_prob),
+                    # conv_bn_relu(batch_norm, 512 * 5, 2048, kernel_size=1, padding=0),
+                    self.concat_process_layer1, 
                     nn.Dropout2d(p=dropout_prob),
                     nn.Conv2d(2048, int(ord_num * 2), 1)
                 )

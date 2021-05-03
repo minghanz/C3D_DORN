@@ -83,15 +83,22 @@ class DepthPredModel(nn.Module):
 
         if self.flag_double_ord:
             self.criterion_so = SecondOrdinalRegressionLoss(self.ord_num, self.gamma, self.beta, self.discretization, double_ord)
+            self.criterion_so.cuda()
 
         if self.render:
-            self.renderer = DepthRend(n_dep_sample=0, out_class=ord_num, size=input_size, align_corners=align_corners, batch_norm=batch_norm, dropout_prob=rend_dropout)
+            self.renderer = DepthRend(n_dep_sample=0, out_class=ord_num, size=input_size, align_corners=align_corners, batch_norm=batch_norm, dropout_prob=rend_dropout, shared_mlp=self.SceneUnderstandingModule.concat_process_layer1)
+            self.renderer.cuda()
 
     def optimizer_params(self):
         group_params = [{"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), 
                          "lr": 1.0},
                         {"params": filter(lambda p: p.requires_grad, self.SceneUnderstandingModule.parameters()),
                          "lr": 10.0}]
+        if self.render:
+            group_params.append(
+                        {"params": filter(lambda p: p.requires_grad, self.renderer.mlp.mlp_nshared.parameters()),
+                         "lr": 10.0}
+            )
         # group_params = [
         #                 {"params": filter(lambda p: p.requires_grad, self.SceneUnderstandingModule.parameters()),
         #                  "lr": 10.0}]
@@ -169,6 +176,8 @@ class DepthPredModel(nn.Module):
 
         if "sample_painter" in out:
             out["sample_painter"] = out["sample_painter"].squeeze(1)  # B*H*W
+        if "feat_painter" in out and out['feat_painter'].shape[1] == 1:
+            out["feat_painter"] = out["feat_painter"].squeeze(1)  # B*H*W
 
         if self.flag_use_prob_loss:
             depth_pred = (out["pmul"] * self.criterion_p.depth_vector.view(1, -1, 1, 1)).sum(1) # N*H*W
@@ -211,6 +220,8 @@ class DepthPredModel(nn.Module):
             out_dict["entropy"] = [out["entropy"]]
         if "sample_painter" in out:
             out_dict["sample_painter"] = [out["sample_painter"]]
+        if "feat_painter" in out:
+            out_dict["feat_painter"] = [out["feat_painter"]]
         return out_dict
 
     def calc_loss(self, out, target, mask=None, mask_gt=None, cam_info=None):

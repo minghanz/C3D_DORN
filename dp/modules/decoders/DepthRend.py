@@ -7,13 +7,35 @@ import torch.nn.functional as F
 from dp.modules.decoders.DepthRendSampler import DepthRendSampler
 from dp.modules.decoders.DepthRendHead import DepthRendHead
 
+def feat_pca(feature, u=None):
+    # input feature is b*c*h*w, need to change to b*c*n
+    b = feature.shape[0]
+    c = feature.shape[1]
+    h = feature.shape[2]
+    w = feature.shape[3]
+    feat_flat = feature.reshape(b, c, h*w)
+
+    feat_new, u = feat_pca_flat(feat_flat, u)
+
+    feat_img = feat_new.reshape(b,c,h,w)
+    feat_img_3 = feat_img[:,0:3,:,:]
+    return feat_img_3, feat_img, u
+
+def feat_pca_flat(feat_flat, u):
+    if u is None:
+        u, s, v = torch.svd(feat_flat)
+    # feat_new = torch.bmm( u[:,:,0:3].transpose(1,2), feat_flat) # b*3*n
+    # feat_img = feat_new.reshape(b,3,h,w)
+    feat_new = torch.bmm( u.transpose(1,2), feat_flat) # b*3*n
+    return feat_new, u
+
 class DepthRend(nn.Module):
-    def __init__(self, n_dep_sample=30, n_pt_sample=900, in_feat_channel=512*5, out_class=90, size=(385, 513), align_corners=False, batch_norm=False, dropout_prob=0.5):
+    def __init__(self, n_dep_sample=30, n_pt_sample=900, in_feat_channel=512*5, out_class=90, size=(385, 513), align_corners=False, batch_norm=False, dropout_prob=0.5, shared_mlp=None):
         super(DepthRend, self).__init__()
         self.align_corners = align_corners
 
         self.sampler = DepthRendSampler(n_dep_sample, n_pt_sample, align_corners)
-        self.mlp = DepthRendHead(in_feat_channel, out_class, batch_norm, dropout_prob=dropout_prob)
+        self.mlp = DepthRendHead(in_feat_channel, out_class, batch_norm, dropout_prob=dropout_prob, shared_mlp=shared_mlp)
 
         self.size = size
 
@@ -43,11 +65,14 @@ class DepthRend(nn.Module):
         else:
             logit = x_dict["net"]["logit"]
             feature = x_dict["net"]["feat"]
+            feature_3, feature_pca, u_pca = feat_pca(feature)
+            feat_painter = feature_3.clone()
             sample_painter = torch.zeros((logit.shape[0], 1, logit.shape[2], logit.shape[3]), dtype=logit.dtype, device=logit.device)
 
             ### recursively upsample the low-res depth prediction to high-res depth prediction
             for scale in range(nsamp_downscale-1, -1, -1):    # nsamp_downscale-1, ..., 0
                 sample_painter = F.interpolate(sample_painter, (logit.shape[2]*2, logit.shape[3]*2), mode='bilinear', align_corners=self.align_corners )  # B*ord_num*H*W
+                feat_painter = F.interpolate(feat_painter, (logit.shape[2]*2, logit.shape[3]*2), mode='bilinear', align_corners=self.align_corners )  # B*ord_num*H*W
                 logit = F.interpolate(logit, (logit.shape[2]*2, logit.shape[3]*2), mode='bilinear', align_corners=self.align_corners )  # B*ord_num*H*W
                 pmul = F.softmax(logit, dim=1)
 
@@ -64,10 +89,14 @@ class DepthRend(nn.Module):
                 sample_dots = torch.ones((x.shape[0], 1, x.shape[2], x.shape[3]), dtype=x.dtype, device=x.device)
                 sample_painter = self.sampler.sampling_set_from_idx_flat(sample_painter, idx_flat, sample_dots)
 
+                feature_3_samp, _, _ = feat_pca(feat_samp_dict['feature'], u_pca)
+                feat_painter = self.sampler.sampling_set_from_idx_flat(feat_painter, idx_flat, feature_3_samp)
+
             assert logit.shape[2] == self.size[0]
             assert logit.shape[3] == self.size[1]
 
             x_dict["full"]["logit"] = logit
             x_dict["full"]["sample_painter"] = sample_painter
+            x_dict["full"]["feat_painter"] = feat_painter
 
         return #x_dict

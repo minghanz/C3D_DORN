@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch
 
 class DepthRendHead(nn.Module):
-    def __init__(self, in_feat_channel, out_class=1, batch_norm=False, dropout_prob=0.5):
+    def __init__(self, in_feat_channel, out_class=1, batch_norm=False, dropout_prob=0.5, shared_mlp=None):
         super(DepthRendHead, self).__init__()
         self.add_cc = False
         self.add_fov = False
@@ -35,17 +35,36 @@ class DepthRendHead(nn.Module):
             if not self.add_dep_embedding:
                 self.add_chnl += 1
 
-        self.mlp = nn.Sequential(
-            nn.Dropout2d(p=dropout_prob),
-            conv_bn_relu(batch_norm, self.in_feat_channel+self.add_chnl, 2048, kernel_size=1, padding=0), 
-            nn.Dropout2d(p=dropout_prob),
-            # conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
-            # nn.Dropout2d(p=dropout_prob),
-            # conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
-            # nn.Conv2d(512, out_class, 1), # B*out*H*W or B*out*1*N 
-            nn.Conv2d(2048, out_class, 1), # B*out*H*W or B*out*1*N
-            # nn.Sigmoid()
-        )
+        if shared_mlp is not None:
+            # self.mlp = shared_mlp
+            self.mlp_nshared = nn.Sequential(
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 2048, 1024, kernel_size=1, padding=0), 
+                nn.Dropout2d(p=dropout_prob),
+                nn.Conv2d(1024, ord_num, 1)
+            )
+            self.mlp = nn.Sequential(
+                shared_mlp, 
+                self.mlp_nshared
+            )
+        else:
+            self.mlp = nn.Sequential(
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, self.in_feat_channel+self.add_chnl, 512, kernel_size=1, padding=0), 
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
+                nn.Dropout2d(p=dropout_prob),
+                conv_bn_relu(batch_norm, 512, 512, kernel_size=1, padding=0), 
+                nn.Dropout2d(p=dropout_prob),
+                nn.Conv2d(512, out_class, 1), # B*out*H*W or B*out*1*N 
+            )
+            self.mlp_nshared = self.mlp
+            # self.mlp = nn.Sequential(
+            #     nn.Dropout2d(p=dropout_prob),
+            #     conv_bn_relu(batch_norm, self.in_feat_channel+self.add_chnl, 2048, kernel_size=1, padding=0), 
+            #     nn.Dropout2d(p=dropout_prob),
+            #     nn.Conv2d(2048, out_class, 1), # B*out*H*W or B*out*1*N
+            # )
 
     def forward(self, feature, depth_samples=None, cc=None, fov=None, nc=None):
         """

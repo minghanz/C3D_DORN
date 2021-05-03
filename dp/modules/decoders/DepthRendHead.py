@@ -41,7 +41,7 @@ class DepthRendHead(nn.Module):
                 nn.Dropout2d(p=dropout_prob),
                 conv_bn_relu(batch_norm, 2048, 1024, kernel_size=1, padding=0), 
                 nn.Dropout2d(p=dropout_prob),
-                nn.Conv2d(1024, ord_num, 1)
+                nn.Conv2d(1024, out_class, 1)
             )
             self.mlp = nn.Sequential(
                 shared_mlp, 
